@@ -33,6 +33,8 @@ jobs:
           # Copy all project files into the repository root, preserving hidden files.
           cp -a "$source_dir"/. .
           rm -rf _project_unpack "$archive"
+          # The connected GitHub App cannot push workflow files; add the Android workflow separately via the GitHub API.
+          rm -f .github/workflows/android.yml
           echo "Top-level repository contents after extraction:"
           ls -la
 
