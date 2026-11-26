@@ -1175,8 +1175,10 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
   }
 
   void _listenAdminBroadcasts() {
+    // Firebase is optional for this build. The website API remains the source
+    // of truth; do not touch Firestore unless a Firebase app was configured.
+    if (Firebase.apps.isEmpty) return;
     try {
-      _adminSub = if (Firebase.apps.isEmpty) return;
       _adminSub = FirebaseFirestore.instance
           .collection('admin_notifications')
           .orderBy('createdAt', descending: true)
