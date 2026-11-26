@@ -137,8 +137,7 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
-  try {
-    runApp(const QuranakApp());
+  runApp(const QuranakApp());
 
   // Platform services initialize after the first frame. A missing network,
   // Firebase response, or alarm permission must never hold the app on a black screen.
