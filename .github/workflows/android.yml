@@ -1,0 +1,68 @@
+name: Quranak Android Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "quranak_flutter_app/**"
+      - "tool/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+
+      - name: Generate Android project scaffolding
+        working-directory: quranak_flutter_app
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp android/app/src/main/AndroidManifest.xml /tmp/quranak-AndroidManifest.xml
+          flutter create --platforms=android --org com.quranak --project-name app .
+          cp /tmp/quranak-AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          python ../tool/prepare_android.py
+
+      - name: Resolve packages
+        working-directory: quranak_flutter_app
+        run: flutter pub get
+
+      - name: Analyze Dart
+        working-directory: quranak_flutter_app
+        run: flutter analyze --no-fatal-infos
+
+      - name: Run tests
+        working-directory: quranak_flutter_app
+        run: flutter test
+
+      - name: Build release APK
+        working-directory: quranak_flutter_app
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quranak-Android-APK
+          path: quranak_flutter_app/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
