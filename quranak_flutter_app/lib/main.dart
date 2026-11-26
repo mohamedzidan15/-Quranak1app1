@@ -1630,27 +1630,14 @@ class OriginalHomeTab extends StatelessWidget {
           ),
           SizedBox(
             height: 112,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: QuranakApi.watchCollection('reciters'),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: QuranakApi.getList('get_reciters', cacheKey: 'cached_reciters_v8'),
               builder: (context, snap) {
-                final liveDocs = snap.data?.docs ?? [];
-                if (liveDocs.isNotEmpty) {
-                  final mapped = liveDocs
-                      .map((d) => {'id': d.id, ...(d.data() as Map<String, dynamic>)})
-                      .toList();
-                  OfflineCacheService.saveReciters(mapped);
-                  return _buildRecitersRow(context, mapped);
+                final reciters = snap.data ?? const <Map<String, dynamic>>[];
+                if (reciters.isEmpty) {
+                  return const Center(child: Text('لا يوجد قراء محفوظون بعد أول اتصال بالإنترنت', style: TextStyle(color: Colors.white54)));
                 }
-                return FutureBuilder<List<Map<String, dynamic>>>(
-                  future: OfflineCacheService.loadReciters(),
-                  builder: (_, cSnap) {
-                    final cached = cSnap.data ?? [];
-                    if (cached.isEmpty) {
-                      return const Center(child: Text('القراء متاحون عند الاتصال أو بعد المزامنة', style: TextStyle(color: Colors.white54)));
-                    }
-                    return _buildRecitersRow(context, cached);
-                  },
-                );
+                return _buildRecitersRow(context, reciters);
               },
             ),
           ),
@@ -2556,12 +2543,10 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
     }
 
     return SafeArea(
-      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: QuranakApi.watchCollection('videos'),
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v8'),
         builder: (context, snap) {
-          final docs = (snap.data?.docs ?? [])
-              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
-              .toList();
+          final docs = snap.data ?? const <Map<String, dynamic>>[];
           if (docs.isEmpty) {
             return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل المقاطع…' : 'لا توجد مقاطع محفوظة أو متاحة حالياً', style: const TextStyle(color: Colors.white60)));
           }
@@ -2932,25 +2917,14 @@ class OriginalAudiosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: StreamBuilder<QuerySnapshot>(
-        stream: QuranakApi.watchCollection('reciters'),
+      child: FutureBuilder<List<Map<String, dynamic>>>(
+        future: QuranakApi.getList('get_reciters', cacheKey: 'cached_reciters_v8'),
         builder: (context, snap) {
-          final liveDocs = snap.data?.docs ?? [];
-          if (liveDocs.isNotEmpty) {
-            final items = liveDocs.map((d) => {'id': d.id, ...(d.data() as Map<String, dynamic>)}).toList();
-            OfflineCacheService.saveReciters(items);
-            return _buildList(context, items);
+          final items = snap.data ?? const <Map<String, dynamic>>[];
+          if (items.isEmpty) {
+            return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل القراء…' : 'لا يوجد قراء محفوظون أوفلاين بعد أول اتصال', style: const TextStyle(color: Colors.white60)));
           }
-          return FutureBuilder<List<Map<String, dynamic>>>(
-            future: OfflineCacheService.loadReciters(),
-            builder: (_, cSnap) {
-              final items = cSnap.data ?? [];
-              if (items.isEmpty) {
-                return const Center(child: Text('لا يوجد قراء محفوظون أوفلاين بعد', style: TextStyle(color: Colors.white60)));
-              }
-              return _buildList(context, items);
-            },
-          );
+          return _buildList(context, items);
         },
       ),
     );
@@ -3021,28 +2995,26 @@ class OriginalReciterDetailScreen extends StatelessWidget {
           Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
           const SizedBox(height: 12),
           Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: QuranakApi.watchCollection('audios'),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: QuranakApi.getAudiosForReciter(reciterData['id']),
               builder: (context, audioSnap) {
-                final apiRows = (audioSnap.data?.docs ?? [])
-                    .map((d) => d.data())
-                    .where((d) => (d['reciter_name'] ?? '').toString() == name)
-                    .toList();
-                final useApiRows = apiRows.isNotEmpty;
-                final count = useApiRows ? apiRows.length : all114Surahs.length;
-                if (audioSnap.connectionState == ConnectionState.waiting && !useApiRows) {
+                final apiRows = audioSnap.data ?? const <Map<String, dynamic>>[];
+                final count = apiRows.length;
+                if (audioSnap.connectionState == ConnectionState.waiting && count == 0) {
                   return const Center(child: CircularProgressIndicator(color: Color(0xFFC9A959)));
+                }
+                if (count == 0) {
+                  return const Center(child: Text('لا توجد تلاوات محفوظة لهذا القارئ حتى الآن', style: TextStyle(color: Colors.white60)));
                 }
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
                   itemCount: count,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
-                    final apiRow = useApiRows ? apiRows[i] : <String, dynamic>{};
-                    final fallback = useApiRows ? <String, dynamic>{} : all114Surahs[i];
-                    final sNumInt = int.tryParse((apiRow['surah_number'] ?? fallback['n'] ?? (i + 1)).toString()) ?? (i + 1);
+                    final apiRow = apiRows[i];
+                    final sNumInt = int.tryParse((apiRow['surah_number'] ?? (i + 1)).toString()) ?? (i + 1);
                     final sNum = sNumInt.toString().padLeft(3, '0');
-                    final title = (apiRow['surah_name'] ?? apiRow['name'] ?? fallback['name'] ?? 'سورة $sNumInt').toString();
+                    final title = (apiRow['surah_name'] ?? apiRow['title'] ?? apiRow['name'] ?? 'سورة $sNumInt').toString();
                     var url = (apiRow['audio_url'] ?? apiRow['file_path'] ?? '').toString().trim();
                     if (url.isEmpty) url = resolveAudioUrl(reciterData, sNumInt);
                     if (url.isNotEmpty && !url.startsWith('http://') && !url.startsWith('https://')) {
