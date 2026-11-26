@@ -1176,6 +1176,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
 
   void _listenAdminBroadcasts() {
     try {
+      _adminSub = if (Firebase.apps.isEmpty) return;
       _adminSub = FirebaseFirestore.instance
           .collection('admin_notifications')
           .orderBy('createdAt', descending: true)
@@ -1604,7 +1605,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 112,
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('reciters').snapshots(),
+              stream: const Stream<QuerySnapshot>.empty(),
               builder: (context, snap) {
                 final liveDocs = snap.data?.docs ?? [];
                 if (liveDocs.isNotEmpty) {
@@ -1655,7 +1656,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 225,
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('videos').limit(10).snapshots(),
+              stream: const Stream<QuerySnapshot>.empty(),
               builder: (context, snap) {
                 final liveDocs = snap.data?.docs ?? [];
                 if (liveDocs.isNotEmpty) {
@@ -2904,7 +2905,7 @@ class OriginalAudiosTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('reciters').snapshots(),
+        stream: const Stream<QuerySnapshot>.empty(),
         builder: (context, snap) {
           final liveDocs = snap.data?.docs ?? [];
           if (liveDocs.isNotEmpty) {
