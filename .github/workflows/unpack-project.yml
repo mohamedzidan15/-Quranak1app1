@@ -3,8 +3,6 @@ name: Unpack Quranak project into repository
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/unpack-project.yml"
 
 permissions:
   contents: write
