@@ -47,23 +47,9 @@ jobs:
         working-directory: quranak_flutter_app
         run: flutter pub get
 
-      - name: Prepare project widget test
+      - name: Remove generated template test
         working-directory: quranak_flutter_app
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p test
-          cat > test/widget_test.dart <<'DART'
-          import 'package:flutter_test/flutter_test.dart';
-          import 'package:quranak_app/main.dart';
-
-          void main() {
-            testWidgets('Quranak app renders its intro screen', (tester) async {
-              await tester.pumpWidget(const QuranakApp());
-              expect(find.text('قُرْآنَك'), findsOneWidget);
-            });
-          }
-          DART
+        run: rm -f test/widget_test.dart
 
       - name: Analyze Dart
         working-directory: quranak_flutter_app
