@@ -48,4 +48,5 @@ jobs:
             exit 0
           fi
           git commit -m "Extract complete Quranak project into repository root"
+          git pull --rebase origin main
           git push
