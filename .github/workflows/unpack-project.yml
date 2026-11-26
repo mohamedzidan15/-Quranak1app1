@@ -1,0 +1,53 @@
+name: Unpack Quranak project into repository
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/unpack-project.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Extract project ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="Quranak_Native_Complete_GitHub.zip"
+          test -f "$archive"
+          mkdir -p _project_unpack
+          unzip -q "$archive" -d _project_unpack
+          # If the archive has one wrapper directory, use its contents.
+          source_dir="_project_unpack"
+          entries=$(find _project_unpack -mindepth 1 -maxdepth 1 | wc -l)
+          if [ "$entries" -eq 1 ] && [ -d "$(find _project_unpack -mindepth 1 -maxdepth 1 -type d | head -n1)" ]; then
+            source_dir="$(find _project_unpack -mindepth 1 -maxdepth 1 -type d | head -n1)"
+          fi
+          # Copy all project files into the repository root, preserving hidden files.
+          cp -a "$source_dir"/. .
+          rm -rf _project_unpack "$archive"
+          echo "Top-level repository contents after extraction:"
+          ls -la
+
+      - name: Commit extracted project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No extracted changes to commit."
+            exit 0
+          fi
+          git commit -m "Extract complete Quranak project into repository root"
+          git push
