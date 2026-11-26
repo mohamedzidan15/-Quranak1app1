@@ -598,14 +598,28 @@ class QuranakApi {
     }
     try {
       final response = await _dio.get(baseUrl, queryParameters: {'action': action, ...params});
-      final body = response.data;
+      dynamic body = response.data;
+      if (body is String) body = jsonDecode(body);
       List<Map<String, dynamic>>? rows;
       if (body is List) {
         rows = body.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-      } else if (body is String) {
-        final decoded = jsonDecode(body);
-        if (decoded is List) {
-          rows = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      } else if (body is Map) {
+        // The website endpoints may return either a bare array or a JSON
+        // envelope. Unwrap only known collection keys; never cache an error
+        // object as an empty content list.
+        dynamic payload = body;
+        for (final keyName in const [
+          'data', 'items', 'results', 'reciters', 'audios', 'videos',
+          'books', 'azkar', 'hadiths', 'categories'
+        ]) {
+          final candidate = payload is Map ? payload[keyName] : null;
+          if (candidate is List) {
+            payload = candidate;
+            break;
+          }
+        }
+        if (payload is List) {
+          rows = payload.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
         }
       }
       if (rows != null) {
@@ -2613,6 +2627,13 @@ class _OriginalCalendarScreenState extends State<OriginalCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final hijri = HijriCalendar.fromDate(_selectedDate);
+    final prayerParams = CalculationMethod.egyptian.getParameters()
+      ..madhab = Madhab.shafi;
+    final selectedPrayerTimes = PrayerTimes(
+      Coordinates(widget.selectedCity.lat, widget.selectedCity.lng),
+      DateComponents.from(_selectedDate),
+      prayerParams,
+    );
     final weekdayName = arabicWeekdaysFull[_selectedDate.weekday];
     final gregorianFull =
         '${_selectedDate.day} ${arabicMonths[_selectedDate.month]} ${_selectedDate.year}';
@@ -2789,8 +2810,65 @@ class _OriginalCalendarScreenState extends State<OriginalCalendarScreen> {
                 ],
               ),
             ),
+            const SizedBox(height: 18),
+            _selectedDatePrayerCard(selectedPrayerTimes),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _selectedDatePrayerCard(PrayerTimes times) {
+    final entries = <MapEntry<String, DateTime>>[
+      MapEntry('الفجر', times.fajr),
+      MapEntry('الشروق', times.sunrise),
+      MapEntry('الظهر', times.dhuhr),
+      MapEntry('العصر', times.asr),
+      MapEntry('المغرب', times.maghrib),
+      MapEntry('العشاء', times.isha),
+    ];
+    String clock(DateTime value) {
+      final h24 = value.hour;
+      final h12 = h24 % 12 == 0 ? 12 : h24 % 12;
+      final minute = value.minute.toString().padLeft(2, '0');
+      final suffix = h24 >= 12 ? 'م' : 'ص';
+      return '$h12:$minute $suffix';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B241E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF1B4D3E).withOpacity(0.6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'مواقيت الصلاة - ${_selectedDate.day} ${arabicMonths[_selectedDate.month]}',
+            textAlign: TextAlign.right,
+            style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.selectedCity.ar,
+            textAlign: TextAlign.right,
+            style: const TextStyle(color: Color(0xFF8CC4B3), fontSize: 12),
+          ),
+          const SizedBox(height: 12),
+          ...entries.map((entry) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Text(entry.key, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Text(clock(entry.value), style: const TextStyle(color: Color(0xFFC9A959), fontWeight: FontWeight.w900)),
+              ],
+            ),
+          )),
+        ],
       ),
     );
   }
