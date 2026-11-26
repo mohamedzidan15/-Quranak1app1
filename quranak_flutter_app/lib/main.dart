@@ -589,9 +589,14 @@ class QuranakApi {
   ));
 
   static Future<List<Map<String, dynamic>>> getList(
-    String action, {Map<String, dynamic> params = const {}, String? cacheKey}
+    String action, {Map<String, dynamic> params = const {}, String? cacheKey, bool refresh = false}
   ) async {
     final key = cacheKey ?? 'quranak_api_$action';
+    // Offline-first: render the last successful response immediately.
+    if (!refresh) {
+      final cached = await _load(key);
+      if (cached.isNotEmpty) return cached;
+    }
     try {
       final response = await _dio.get(baseUrl, queryParameters: {'action': action, ...params});
       final body = response.data;
@@ -614,11 +619,12 @@ class QuranakApi {
     return _load(key);
   }
 
-  static Future<List<Map<String, dynamic>>> getAudiosForReciter(dynamic reciterId) {
+  static Future<List<Map<String, dynamic>>> getAudiosForReciter(dynamic reciterId, {bool refresh = false}) {
     final id = reciterId.toString();
     return getList('get_audios',
       params: {'reciter_id': id},
       cacheKey: 'cached_audios_reciter_$id',
+      refresh: refresh,
     );
   }
 
@@ -636,13 +642,13 @@ class QuranakApi {
 
   static Future<void> syncCatalogs() async {
     // Sequential, bounded requests are friendlier to free shared hosting.
-    final reciters = await getList('get_reciters', cacheKey: 'cached_reciters_v8');
-    final videos = await getList('get_videos', cacheKey: 'cached_videos_v8');
+    final reciters = await getList('get_reciters', cacheKey: 'cached_reciters_v8', refresh: true);
+    final videos = await getList('get_videos', cacheKey: 'cached_videos_v8', refresh: true);
     // Audio API is keyed by the SQL reciter ID, not by reciter name.
     for (final reciter in reciters) {
       final reciterId = reciter['id'];
       if (reciterId != null) {
-        await getAudiosForReciter(reciterId);
+        await getAudiosForReciter(reciterId, refresh: true);
       }
     }
     await getList('get_books', params: {'status': 1}, cacheKey: 'cached_books_v1');
