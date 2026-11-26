@@ -10,73 +10,62 @@ def first_existing(paths):
 
 
 def add_plugin(settings_file, app_file):
-    # Firebase's Google Services plugin is only valid when the project actually
-    # supplies google-services.json. This repository intentionally does not
-    # commit that secret/configuration file.
+    # Only apply Google Services when its configuration is actually supplied.
     google_services_json = ROOT / "app" / "google-services.json"
     if not google_services_json.exists():
         return
-
-    settings_text = settings_file.read_text() if settings_file else ""
-    if settings_file and "com.google.gms.google-services" not in settings_text:
-        line = '    id("com.google.gms.google-services") version "4.4.2" apply false'
-        settings_text = settings_text.replace("plugins {", "plugins {\\n" + line, 1)
-        settings_file.write_text(settings_text)
-
+    if settings_file:
+        settings_text = settings_file.read_text()
+        if "com.google.gms.google-services" not in settings_text:
+            line = '    id("com.google.gms.google-services") version "4.4.2" apply false'
+            settings_file.write_text(settings_text.replace("plugins {", "plugins {\n" + line, 1))
     app_text = app_file.read_text()
     if "com.google.gms.google-services" not in app_text:
         plugin = ('    id("com.google.gms.google-services")' if app_file.suffix == ".kts"
                   else '    id "com.google.gms.google-services"')
-        app_text = app_text.replace("plugins {", "plugins {\\n" + plugin, 1)
-        app_file.write_text(app_text)
+        app_file.write_text(app_text.replace("plugins {", "plugins {\n" + plugin, 1))
 
 
 def configure_desugaring(app_file):
     text = app_file.read_text()
-    is_kotlin = app_file.suffix == ".kts"
+    kotlin_dsl = app_file.suffix == ".kts"
 
-    if is_kotlin:
+    if kotlin_dsl:
         enabled = "isCoreLibraryDesugaringEnabled = true"
         dependency = 'coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")'
-        if enabled not in text:
-            if "compileOptions {" not in text:
-                raise RuntimeError("Android app Gradle file has no compileOptions block")
-            text = text.replace(
-                "compileOptions {",
-                "compileOptions {\\n        " + enabled +
-                "\\n        sourceCompatibility = JavaVersion.VERSION_17" +
-                "\\n        targetCompatibility = JavaVersion.VERSION_17",
-                1,
-            )
-        if "coreLibraryDesugaring(" not in text:
-            if "dependencies {" not in text:
-                text += "\\ndependencies {\\n    " + dependency + "\\n}\\n"
-            else:
-                text = text.replace("dependencies {", "dependencies {\\n    " + dependency, 1)
+        compile_settings = (
+            "compileOptions {\n        " + enabled +
+            "\n        sourceCompatibility = JavaVersion.VERSION_17" +
+            "\n        targetCompatibility = JavaVersion.VERSION_17"
+        )
+        dependency_line = "    " + dependency
+        dependency_check = "coreLibraryDesugaring("
     else:
         enabled = "coreLibraryDesugaringEnabled true"
         dependency = "coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'"
-        if enabled not in text:
-            if "compileOptions {" not in text:
-                raise RuntimeError("Android app Gradle file has no compileOptions block")
-            text = text.replace(
-                "compileOptions {",
-                "compileOptions {\\n        " + enabled +
-                "\\n        sourceCompatibility JavaVersion.VERSION_17" +
-                "\\n        targetCompatibility JavaVersion.VERSION_17",
-                1,
-            )
-        if "coreLibraryDesugaring " not in text:
-            if "dependencies {" not in text:
-                text += "\\ndependencies {\\n    " + dependency + "\\n}\\n"
-            else:
-                text = text.replace("dependencies {", "dependencies {\\n    " + dependency, 1)
+        compile_settings = (
+            "compileOptions {\n        " + enabled +
+            "\n        sourceCompatibility JavaVersion.VERSION_17" +
+            "\n        targetCompatibility JavaVersion.VERSION_17"
+        )
+        dependency_line = "    " + dependency
+        dependency_check = "coreLibraryDesugaring "
 
-    # Fail early rather than allowing Gradle to fail much later.
+    if enabled not in text:
+        if "compileOptions {" not in text:
+            raise RuntimeError("Android app Gradle file has no compileOptions block")
+        text = text.replace("compileOptions {", compile_settings, 1)
+
+    if dependency_check not in text:
+        if "dependencies {" in text:
+            text = text.replace("dependencies {", "dependencies {\n" + dependency_line, 1)
+        else:
+            text += "\ndependencies {\n" + dependency_line + "\n}\n"
+
     if enabled not in text or dependency not in text:
         raise RuntimeError("Failed to configure Android core library desugaring")
-    if "\\\\n" in text:
-        raise RuntimeError("Invalid literal \\n sequence found in generated Gradle file")
+    if "\\n" in text:
+        raise RuntimeError("Invalid literal backslash-n sequence found in Gradle file")
     app_file.write_text(text)
 
 
@@ -85,7 +74,6 @@ def main():
     app_file = first_existing(APP_CANDIDATES)
     if not app_file:
         raise FileNotFoundError("Flutter did not generate android/app/build.gradle(.kts)")
-
     add_plugin(settings_file, app_file)
     configure_desugaring(app_file)
     print(f"Android Gradle configuration verified: {app_file}")
