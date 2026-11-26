@@ -1673,27 +1673,15 @@ class OriginalHomeTab extends StatelessWidget {
           ),
           SizedBox(
             height: 225,
-            child: StreamBuilder<QuerySnapshot>(
-              stream: QuranakApi.watchCollection('videos'),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v8'),
               builder: (context, snap) {
-                final liveDocs = snap.data?.docs ?? [];
-                if (liveDocs.isNotEmpty) {
-                  final mapped = liveDocs
-                      .map((d) => {'id': d.id, ...(d.data() as Map<String, dynamic>)})
-                      .toList();
-                  OfflineCacheService.saveVideos(mapped);
-                  return _buildVideosRow(context, mapped);
+                final videos = snap.data ?? const <Map<String, dynamic>>[];
+                if (videos.isEmpty) {
+                  return const Center(child: Text('لا توجد مقاطع مضافة حديثاً', style: TextStyle(color: Colors.white54)));
                 }
-                return FutureBuilder<List<Map<String, dynamic>>>(
-                  future: OfflineCacheService.loadVideos(),
-                  builder: (_, cSnap) {
-                    final cached = cSnap.data ?? [];
-                    if (cached.isEmpty) {
-                      return const Center(child: Text('لا توجد مقاطع مضافة حديثاً', style: TextStyle(color: Colors.white54)));
-                    }
-                    return _buildVideosRow(context, cached);
-                  },
-                );
+                OfflineCacheService.saveVideos(videos);
+                return _buildVideosRow(context, videos);
               },
             ),
           ),
