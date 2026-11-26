@@ -329,7 +329,7 @@ class AdhanAlarmService {
                     ),
                   ],
                 ),
-                iOS: const DarwinInitializationDetails(
+                iOS: const DarwinNotificationDetails(
                   presentAlert: true,
                   presentSound: true,
                   sound: 'adhan.mp3',
