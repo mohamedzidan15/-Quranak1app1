@@ -583,11 +583,38 @@ class QuranakApi {
     headers: const {'Accept': 'application/json', 'User-Agent': 'Quranak-Android/1.0'},
   ));
 
+  static Stream<QuerySnapshot<Map<String, dynamic>>> watchCollection(String collection) {
+    if (Firebase.apps.isEmpty) return const Stream.empty();
+    try {
+      return FirebaseFirestore.instance.collection(collection).snapshots();
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
+
   static Future<List<Map<String, dynamic>>> getList(
     String action, {Map<String, dynamic> params = const {}, String? cacheKey}
   ) async {
     final key = cacheKey ?? 'quranak_api_$action';
     try {
+      // The current admin panel writes these collections to Firebase Firestore.
+      // Read from the same source first; PHP is only a legacy fallback.
+      if (Firebase.apps.isNotEmpty &&
+          (action == 'get_reciters' || action == 'get_videos' || action == 'get_audios')) {
+        Query<Map<String, dynamic>> query = FirebaseFirestore.instance.collection(
+          action == 'get_reciters' ? 'reciters' : (action == 'get_videos' ? 'videos' : 'audios'),
+        );
+        if (action == 'get_audios') {
+          final reciterName = (params['reciter_name'] ?? '').toString();
+          if (reciterName.isNotEmpty) {
+            query = query.where('reciter_name', isEqualTo: reciterName);
+          }
+        }
+        final snapshot = await query.get();
+        final rows = snapshot.docs.map((d) => <String, dynamic>{'id': d.id, ...d.data()}).toList();
+        await _save(key, rows);
+        return rows;
+      }
       final response = await _dio.get(baseUrl, queryParameters: {'action': action, ...params});
       final body = response.data;
       if (body is List) {
@@ -1103,7 +1130,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
 
   Future<void> _initEverything() async {
     await OfflineAudioManager.instance.init();
-    // Load cached content immediately; refresh from the website when online.
+    // Load Firebase-backed admin content immediately and keep the screens refreshed.
     unawaited(QuranakApi.syncCatalogs().then((_) { if (mounted) setState(() {}); }));
     final prefs = await SharedPreferences.getInstance();
     final savedCity = prefs.getString('selectedCity') ?? 'القاهرة';
@@ -1242,7 +1269,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
       return '$clean$p3.mp3';
     }
 
-    return 'https://server8.mp3quran.net/afs/$p3.mp3';
+    return ''; // Never invent a reciter URL; use the exact audio_url saved by the admin.
   }
 
   Future<void> _playSurahAudio({
@@ -1607,7 +1634,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 112,
             child: StreamBuilder<QuerySnapshot>(
-              stream: const Stream<QuerySnapshot>.empty(),
+              stream: QuranakApi.watchCollection('reciters'),
               builder: (context, snap) {
                 final liveDocs = snap.data?.docs ?? [];
                 if (liveDocs.isNotEmpty) {
@@ -1658,7 +1685,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 225,
             child: StreamBuilder<QuerySnapshot>(
-              stream: const Stream<QuerySnapshot>.empty(),
+              stream: QuranakApi.watchCollection('videos'),
               builder: (context, snap) {
                 final liveDocs = snap.data?.docs ?? [];
                 if (liveDocs.isNotEmpty) {
@@ -2907,7 +2934,7 @@ class OriginalAudiosTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: StreamBuilder<QuerySnapshot>(
-        stream: const Stream<QuerySnapshot>.empty(),
+        stream: QuranakApi.watchCollection('reciters'),
         builder: (context, snap) {
           final liveDocs = snap.data?.docs ?? [];
           if (liveDocs.isNotEmpty) {
@@ -2996,7 +3023,7 @@ class OriginalReciterDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: QuranakApi.getList('get_audios', params: {'reciter_id': reciterKey}, cacheKey: 'cached_audios_$reciterKey'),
+              future: QuranakApi.getList('get_audios', params: {'reciter_name': name}, cacheKey: 'cached_audios_$reciterKey'),
               builder: (context, audioSnap) {
                 final apiRows = audioSnap.data ?? const <Map<String, dynamic>>[];
                 final useApiRows = apiRows.isNotEmpty;
