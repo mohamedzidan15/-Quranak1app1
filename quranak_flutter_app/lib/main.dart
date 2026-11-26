@@ -3051,7 +3051,7 @@ class OriginalReciterDetailScreen extends StatelessWidget {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           leading: CircleAvatar(backgroundColor: const Color(0xFFC9A959), child: Text('$sNumInt', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
                           title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          subtitle: Text(saved ? 'محفوظ بدون نت' : (apiRow['duration']?.toString().isNotEmpty == true ? apiRow['duration'].toString() : '${fallback['ayahs'] ?? ''} آية'), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                          subtitle: Text(saved ? 'محفوظ بدون نت' : (apiRow['duration']?.toString().isNotEmpty == true ? apiRow['duration'].toString() : 'رقم السورة $sNumInt'), style: const TextStyle(color: Colors.white60, fontSize: 12)),
                           trailing: prog != null
                               ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(value: prog, strokeWidth: 2.5, color: const Color(0xFFC9A959)))
                               : IconButton(
