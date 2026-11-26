@@ -2500,6 +2500,16 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
     }
   }
 
+  String _videoSourceUrl(Map<String, dynamic> data) {
+    final type = (data['video_type'] ?? '').toString();
+    if (type == 'file') {
+      final path = (data['file_path'] ?? '').toString().trim();
+      if (path.isEmpty) return '';
+      return 'https://quran1.kesug.com/uploads/${path.startsWith('/') ? path.substring(1) : path}';
+    }
+    return (data['video_url'] ?? data['videoUrl'] ?? data['url'] ?? '').toString().trim();
+  }
+
   Future<void> _loadVideo(String url) async {
     if (!widget.isActive || url.isEmpty) return;
     if (_currentUrl == url && _vc != null && _vc!.value.isInitialized) {
@@ -2551,7 +2561,7 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
             return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل المقاطع…' : 'لا توجد مقاطع محفوظة أو متاحة حالياً', style: const TextStyle(color: Colors.white60)));
           }
           final firstData = docs[_currentIdx.clamp(0, docs.length - 1).toInt()];
-          final firstUrl = (firstData['videoUrl'] ?? firstData['video_url'] ?? firstData['url'] ?? '').toString();
+          final firstUrl = _videoSourceUrl(firstData);
           if (firstUrl.isNotEmpty && _currentUrl != firstUrl) {
             WidgetsBinding.instance.addPostFrameCallback((_) => _loadVideo(firstUrl));
           }
@@ -2561,7 +2571,7 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
             onPageChanged: (i) {
               setState(() => _currentIdx = i);
               final d = docs[i];
-              final u = (d['videoUrl'] ?? d['video_url'] ?? d['url'] ?? '').toString();
+              final u = _videoSourceUrl(d);
               _loadVideo(u);
             },
             itemBuilder: (context, i) {
@@ -3015,8 +3025,13 @@ class OriginalReciterDetailScreen extends StatelessWidget {
                     final sNumInt = int.tryParse((apiRow['surah_number'] ?? (i + 1)).toString()) ?? (i + 1);
                     final sNum = sNumInt.toString().padLeft(3, '0');
                     final title = (apiRow['surah_name'] ?? apiRow['title'] ?? apiRow['name'] ?? 'سورة $sNumInt').toString();
-                    var url = (apiRow['audio_url'] ?? apiRow['file_path'] ?? '').toString().trim();
-                    if (url.isEmpty) url = resolveAudioUrl(reciterData, sNumInt);
+                    var url = (apiRow['audio_url'] ?? '').toString().trim();
+                    if ((apiRow['audio_type'] ?? '').toString() == 'file') {
+                      final filePath = (apiRow['file_path'] ?? '').toString().trim();
+                      url = filePath.isEmpty ? '' : 'https://quran1.kesug.com/uploads/${filePath.startsWith('/') ? filePath.substring(1) : filePath}';
+                    } else if (url.isEmpty) {
+                      url = resolveAudioUrl(reciterData, sNumInt);
+                    }
                     if (url.isNotEmpty && !url.startsWith('http://') && !url.startsWith('https://')) {
                       url = 'https://quran1.kesug.com/${url.startsWith('/') ? url.substring(1) : url}';
                     }
