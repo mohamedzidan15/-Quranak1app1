@@ -2559,10 +2559,12 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
     }
 
     return SafeArea(
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v8'),
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: QuranakApi.watchCollection('videos'),
         builder: (context, snap) {
-          final docs = snap.data ?? const <Map<String, dynamic>>[];
+          final docs = (snap.data?.docs ?? [])
+              .map((d) => <String, dynamic>{'id': d.id, ...d.data()})
+              .toList();
           if (docs.isEmpty) {
             return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل المقاطع…' : 'لا توجد مقاطع محفوظة أو متاحة حالياً', style: const TextStyle(color: Colors.white60)));
           }
@@ -3022,10 +3024,13 @@ class OriginalReciterDetailScreen extends StatelessWidget {
           Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
           const SizedBox(height: 12),
           Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: QuranakApi.getList('get_audios', params: {'reciter_name': name}, cacheKey: 'cached_audios_$reciterKey'),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: QuranakApi.watchCollection('audios'),
               builder: (context, audioSnap) {
-                final apiRows = audioSnap.data ?? const <Map<String, dynamic>>[];
+                final apiRows = (audioSnap.data?.docs ?? [])
+                    .map((d) => d.data())
+                    .where((d) => (d['reciter_name'] ?? '').toString() == name)
+                    .toList();
                 final useApiRows = apiRows.isNotEmpty;
                 final count = useApiRows ? apiRows.length : all114Surahs.length;
                 if (audioSnap.connectionState == ConnectionState.waiting && !useApiRows) {
