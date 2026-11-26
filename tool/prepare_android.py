@@ -34,4 +34,15 @@ if app:
             s=s.replace('kotlinOptions {', "kotlinOptions {\n        jvmTarget = '17'",1)
         if 'coreLibraryDesugaring ' not in s:
             s=s.replace('dependencies {', "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'",1)
+    # AndroidX notification/alarm plugins require core library desugaring.
+    # Keep the dependency in the generated app module; otherwise Gradle fails
+    # while creating :app:l8DexDesugarLibRelease.
+    if app.suffix == '.kts':
+        if 'coreLibraryDesugaring(' not in s:
+            if 'dependencies {' in s:
+                s=s.replace('dependencies {', 'dependencies {\\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")', 1)
+    else:
+        if 'coreLibraryDesugaring ' not in s:
+            if 'dependencies {' in s:
+                s=s.replace('dependencies {', "dependencies {\\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'", 1)
     app.write_text(s)
