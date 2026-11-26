@@ -110,6 +110,26 @@ Future<void> onAdhanAlarmFired(int alarmId, Map<String, dynamic> params) async {
   AdhanAlarmService.openAdhanScreen('صلاة $prayerName');
 }
 
+Future<void> _initializePlatformServices() async {
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.quranak.app.channel.audio',
+      androidNotificationChannelName: 'تلاوات قرآنك',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+    ).timeout(const Duration(seconds: 5));
+  } catch (_) {}
+  try {
+    await Firebase.initializeApp().timeout(const Duration(seconds: 5));
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  } catch (_) {}
+  try {
+    tz.initializeTimeZones();
+    await AndroidAlarmManager.initialize().timeout(const Duration(seconds: 5));
+    await AdhanAlarmService.init().timeout(const Duration(seconds: 5));
+  } catch (_) {}
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -118,26 +138,11 @@ void main() async {
   ));
 
   try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.quranak.app.channel.audio',
-      androidNotificationChannelName: 'تلاوات قرآنك',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-    );
-  } catch (_) {}
+    runApp(const QuranakApp());
 
-  try {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  } catch (_) {}
-
-  try {
-    tz.initializeTimeZones();
-    await AndroidAlarmManager.initialize();
-    await AdhanAlarmService.init();
-  } catch (_) {}
-
-  runApp(const QuranakApp());
+  // Platform services initialize after the first frame. A missing network,
+  // Firebase response, or alarm permission must never hold the app on a black screen.
+  unawaited(_initializePlatformServices());
 }
 
 class AdhanAlarmService {
@@ -583,55 +588,38 @@ class QuranakApi {
     headers: const {'Accept': 'application/json', 'User-Agent': 'Quranak-Android/1.0'},
   ));
 
-  static Stream<QuerySnapshot<Map<String, dynamic>>> watchCollection(String collection) {
-    if (Firebase.apps.isEmpty) return const Stream.empty();
-    try {
-      return FirebaseFirestore.instance.collection(collection).snapshots();
-    } catch (_) {
-      return const Stream.empty();
-    }
-  }
-
   static Future<List<Map<String, dynamic>>> getList(
     String action, {Map<String, dynamic> params = const {}, String? cacheKey}
   ) async {
     final key = cacheKey ?? 'quranak_api_$action';
     try {
-      // The current admin panel writes these collections to Firebase Firestore.
-      // Read from the same source first; PHP is only a legacy fallback.
-      if (Firebase.apps.isNotEmpty &&
-          (action == 'get_reciters' || action == 'get_videos' || action == 'get_audios')) {
-        Query<Map<String, dynamic>> query = FirebaseFirestore.instance.collection(
-          action == 'get_reciters' ? 'reciters' : (action == 'get_videos' ? 'videos' : 'audios'),
-        );
-        if (action == 'get_audios') {
-          final reciterName = (params['reciter_name'] ?? '').toString();
-          if (reciterName.isNotEmpty) {
-            query = query.where('reciter_name', isEqualTo: reciterName);
-          }
-        }
-        final snapshot = await query.get();
-        final rows = snapshot.docs.map((d) => <String, dynamic>{'id': d.id, ...d.data()}).toList();
-        await _save(key, rows);
-        return rows;
-      }
       final response = await _dio.get(baseUrl, queryParameters: {'action': action, ...params});
       final body = response.data;
+      List<Map<String, dynamic>>? rows;
       if (body is List) {
-        final rows = body.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        rows = body.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      } else if (body is String) {
+        final decoded = jsonDecode(body);
+        if (decoded is List) {
+          rows = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      }
+      if (rows != null) {
         await _save(key, rows);
         return rows;
       }
-      if (body is String) {
-        final decoded = jsonDecode(body);
-        if (decoded is List) {
-          final rows = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-          await _save(key, rows);
-          return rows;
-        }
-      }
-    } catch (_) {}
+    } catch (_) {
+      // Network failure is expected in offline mode: return the last good snapshot.
+    }
     return _load(key);
+  }
+
+  static Future<List<Map<String, dynamic>>> getAudiosForReciter(dynamic reciterId) {
+    final id = reciterId.toString();
+    return getList('get_audios',
+      params: {'reciter_id': id},
+      cacheKey: 'cached_audios_reciter_$id',
+    );
   }
 
   static Future<void> _save(String key, List<Map<String, dynamic>> rows) async {
@@ -650,6 +638,13 @@ class QuranakApi {
     // Sequential, bounded requests are friendlier to free shared hosting.
     final reciters = await getList('get_reciters', cacheKey: 'cached_reciters_v8');
     final videos = await getList('get_videos', cacheKey: 'cached_videos_v8');
+    // Audio API is keyed by the SQL reciter ID, not by reciter name.
+    for (final reciter in reciters) {
+      final reciterId = reciter['id'];
+      if (reciterId != null) {
+        await getAudiosForReciter(reciterId);
+      }
+    }
     await getList('get_books', params: {'status': 1}, cacheKey: 'cached_books_v1');
     await getList('get_azkar_categories', cacheKey: 'cached_azkar_categories_v1');
     await getList('get_hadiths', cacheKey: 'cached_hadiths_v1');
@@ -1129,17 +1124,19 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
   }
 
   Future<void> _initEverything() async {
-    await OfflineAudioManager.instance.init();
-    // Load Firebase-backed admin content immediately and keep the screens refreshed.
+    // Render the shell immediately; disk/network services are non-blocking.
+    unawaited(OfflineAudioManager.instance.init());
     unawaited(QuranakApi.syncCatalogs().then((_) { if (mounted) setState(() {}); }));
-    final prefs = await SharedPreferences.getInstance();
-    final savedCity = prefs.getString('selectedCity') ?? 'القاهرة';
-    _selectedCity = egyptianCities.firstWhere(
-      (c) => c.ar == savedCity,
-      orElse: () => egyptianCities.first,
-    );
-    await _refreshCityAndAdhan(_selectedCity);
-    _listenAdminBroadcasts();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedCity = prefs.getString('selectedCity') ?? 'القاهرة';
+      _selectedCity = egyptianCities.firstWhere(
+        (c) => c.ar == savedCity,
+        orElse: () => egyptianCities.first,
+      );
+    } catch (_) {}
+    // Prayer times are calculated locally; alarm scheduling is best-effort.
+    unawaited(_refreshCityAndAdhan(_selectedCity));
   }
 
   Future<void> _refreshCityAndAdhan(CityInfo city) async {
