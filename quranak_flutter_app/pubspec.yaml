@@ -1,7 +1,7 @@
 name: quranak_app
 description: تطبيق قرآنك الإسلامي - تصميم عربي مطابق للموقع، يعمل أوفلاين، أذان تلقائي كالمنبه، لوحة تحكم وإشعارات
 publish_to: 'none'
-version: 8.0.0+8
+version: 9.0.0+9
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
