@@ -631,7 +631,7 @@ class QuranakApi {
     final id = reciterId.toString();
     return getList('get_audios',
       params: {'reciter_id': id},
-      cacheKey: 'cached_audios_reciter_$id',
+      cacheKey: 'cached_audios_reciter_v9_$id',
       refresh: refresh,
     );
   }
@@ -650,8 +650,8 @@ class QuranakApi {
 
   static Future<void> syncCatalogs() async {
     // Sequential, bounded requests are friendlier to free shared hosting.
-    final reciters = await getList('get_reciters', cacheKey: 'cached_reciters_v8', refresh: true);
-    final videos = await getList('get_videos', cacheKey: 'cached_videos_v8', refresh: true);
+    final reciters = await getList('get_reciters', cacheKey: 'cached_reciters_v9', refresh: true);
+    final videos = await getList('get_videos', cacheKey: 'cached_videos_v9', refresh: true);
     // Audio API is keyed by the SQL reciter ID, not by reciter name.
     for (final reciter in reciters) {
       final reciterId = reciter['id'];
@@ -659,9 +659,9 @@ class QuranakApi {
         await getAudiosForReciter(reciterId, refresh: true);
       }
     }
-    await getList('get_books', params: {'status': 1}, cacheKey: 'cached_books_v1');
-    await getList('get_azkar_categories', cacheKey: 'cached_azkar_categories_v1');
-    await getList('get_hadiths', cacheKey: 'cached_hadiths_v1');
+    await getList('get_books', params: {'status': 1}, cacheKey: 'cached_books_v9');
+    await getList('get_azkar_categories', cacheKey: 'cached_azkar_categories_v9');
+    await getList('get_hadiths', cacheKey: 'cached_hadiths_v9');
     // Preserve API-native fields while providing aliases used by older widgets.
     final normalized = videos.map((v) {
       final m = Map<String, dynamic>.from(v);
@@ -677,8 +677,8 @@ class QuranakApi {
       m['reciter'] ??= m['reciter_name'] ?? m['title'] ?? 'مقطع قرآني';
       return m;
     }).toList();
-    await _save('cached_videos_v8', normalized);
-    await _save('cached_reciters_v8', reciters);
+    await _save('cached_videos_v9', normalized);
+    await _save('cached_reciters_v9', reciters);
   }
 }
 
@@ -814,14 +814,14 @@ class OfflineCacheService {
   static Future<void> saveReciters(List<Map<String, dynamic>> list) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_reciters_v8', jsonEncode(list));
+      await prefs.setString('cached_reciters_v9', jsonEncode(list));
     } catch (_) {}
   }
 
   static Future<List<Map<String, dynamic>>> loadReciters() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cached_reciters_v8');
+      final raw = prefs.getString('cached_reciters_v9');
       if (raw != null) return (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
     } catch (_) {}
     return [];
@@ -830,14 +830,14 @@ class OfflineCacheService {
   static Future<void> saveVideos(List<Map<String, dynamic>> list) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('cached_videos_v8', jsonEncode(list));
+      await prefs.setString('cached_videos_v9', jsonEncode(list));
     } catch (_) {}
   }
 
   static Future<List<Map<String, dynamic>>> loadVideos() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('cached_videos_v8');
+      final raw = prefs.getString('cached_videos_v9');
       if (raw != null) return (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
     } catch (_) {}
     return [];
@@ -1649,7 +1649,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 112,
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: QuranakApi.getList('get_reciters', cacheKey: 'cached_reciters_v8'),
+              future: QuranakApi.getList('get_reciters', cacheKey: 'cached_reciters_v9'),
               builder: (context, snap) {
                 final reciters = snap.data ?? const <Map<String, dynamic>>[];
                 if (reciters.isEmpty) {
@@ -1687,7 +1687,7 @@ class OriginalHomeTab extends StatelessWidget {
           SizedBox(
             height: 225,
             child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v8'),
+              future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v9'),
               builder: (context, snap) {
                 final videos = snap.data ?? const <Map<String, dynamic>>[];
                 if (videos.isEmpty) {
@@ -2553,7 +2553,7 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
 
     return SafeArea(
       child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v8'),
+        future: QuranakApi.getList('get_videos', cacheKey: 'cached_videos_v9'),
         builder: (context, snap) {
           final docs = snap.data ?? const <Map<String, dynamic>>[];
           if (docs.isEmpty) {
@@ -3049,7 +3049,7 @@ class _OriginalAudiosTabState extends State<OriginalAudiosTab>{
   final _search=TextEditingController();String _query='';
   @override void dispose(){_search.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>SafeArea(child:FutureBuilder<List<Map<String,dynamic>>>(
-    future:QuranakApi.getList('get_reciters',cacheKey:'cached_reciters_v8'),
+    future:QuranakApi.getList('get_reciters',cacheKey:'cached_reciters_v9'),
     builder:(context,snap){
       final all=snap.data??<Map<String,dynamic>>[];
       final items=all.where((r)=>(r['name']??'').toString().toLowerCase().contains(_query.toLowerCase())).toList();
