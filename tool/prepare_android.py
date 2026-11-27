@@ -75,10 +75,20 @@ def configure_launch_background():
     # Keep the native hand-off clean; the app immediately shows the Quranak artwork.
     xml = '''<?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="#071915" />
+    <item android:drawable="@color/quranak_splash_background" />
 </layer-list>
 '''
     res = ROOT / "app" / "src" / "main" / "res"
+    values = res / "values"
+    values.mkdir(parents=True, exist_ok=True)
+    colors = values / "colors.xml"
+    color = '<color name="quranak_splash_background">#071915</color>'
+    if colors.exists():
+        content = colors.read_text()
+        if "quranak_splash_background" not in content:
+            colors.write_text(content.replace("</resources>", f"    {color}\\n</resources>"))
+    else:
+        colors.write_text('<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n    ' + color + '\\n</resources>\\n')
     for folder in ("drawable", "drawable-v21"):
         target = res / folder / "launch_background.xml"
         target.parent.mkdir(parents=True, exist_ok=True)
