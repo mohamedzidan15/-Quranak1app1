@@ -583,7 +583,7 @@ String quranakMediaUrl(String raw, {String uploadFolder = 'uploads'}) {
 /// Quranak website API integration. Public read endpoints are cached locally so
 /// the previously synchronized catalog remains visible without connectivity.
 class QuranakApi {
-  static const String baseUrl = 'https://quran1.kesug.com/index.php';
+  static const String baseUrl = 'https://quranak.alwaysdata.net/index.php';
   static final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 12),
     receiveTimeout: const Duration(seconds: 25),
@@ -3271,7 +3271,7 @@ class ReciterAvatarImage extends StatelessWidget {
 /// Quranak website API integration. Public read endpoints are cached locally so
 /// the previously synchronized catalog remains visible without connectivity.
 class QuranakApi {
-  static const String baseUrl = 'https://quran1.kesug.com/index.php';
+  static const String baseUrl = 'https://quranak.alwaysdata.net/index.php';
   static final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 12),
     receiveTimeout: const Duration(seconds: 25),
