@@ -1348,7 +1348,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         resolveAudioUrl: _resolveReciterAudioUrl,
       ),
       OriginalReelsTab(isActive: _tabIndex == 4),
-      const OriginalDownloadsTab(),
+      OriginalDownloadsTab(onPlayAudio: _playSurahAudio),
     ];
 
     return Scaffold(
@@ -1737,8 +1737,8 @@ class OriginalHomeTab extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => OriginalReciterDetailScreen(
                 reciterData: r,
-                onPlayAudio: onPlayAudio,
-                resolveAudioUrl: resolveAudioUrl,
+                onPlayAudio: widget.onPlayAudio,
+                resolveAudioUrl: widget.resolveAudioUrl,
               ),
             ),
           ),
@@ -3009,7 +3009,7 @@ class OriginalHadithScreen extends StatelessWidget {
   }
 }
 
-class OriginalAudiosTab extends StatelessWidget {
+class OriginalAudiosTab extends StatefulWidget {
   final Function({required String id, required String title, required String reciter, required Map<String, dynamic> reciterData, required String url}) onPlayAudio;
   final String Function(Map<String, dynamic> reciterData, int surahNum) resolveAudioUrl;
 
@@ -3018,6 +3018,13 @@ class OriginalAudiosTab extends StatelessWidget {
     required this.onPlayAudio,
     required this.resolveAudioUrl,
   });
+
+  @override
+  State<OriginalAudiosTab> createState() => _OriginalAudiosTabState();
+}
+
+class _OriginalAudiosTabState extends State<OriginalAudiosTab> {
+  String _query = '';
 
   @override
   Widget build(BuildContext context) {
@@ -3029,13 +3036,34 @@ class OriginalAudiosTab extends StatelessWidget {
           if (items.isEmpty) {
             return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل القراء…' : 'لا يوجد قراء محفوظون أوفلاين بعد أول اتصال', style: const TextStyle(color: Colors.white60)));
           }
-          return _buildList(context, items);
+          final filtered = items.where((r) => (r['name'] ?? '').toString().toLowerCase().contains(_query.trim().toLowerCase())).toList();
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: TextField(
+                  textAlign: TextAlign.right,
+                  onChanged: (v) => setState(() => _query = v),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'ابحث عن قارئ...', hintStyle: const TextStyle(color: Colors.white54),
+                    prefixIcon: const Icon(Icons.search, color: Color(0xFFC9A959)),
+                    filled: true, fillColor: const Color(0xFF0F2B3D),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: const BorderSide(color: Color(0xFFC9A959))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide(color: const Color(0xFFC9A959).withOpacity(.7))),
+                  ),
+                ),
+              ),
+              Expanded(child: _buildList(context, filtered)),
+            ],
+          );
         },
       ),
     );
   }
 
   Widget _buildList(BuildContext context, List<Map<String, dynamic>> items) {
+    if (items.isEmpty) return const Center(child: Text('لا توجد نتائج مطابقة', style: TextStyle(color: Colors.white60)));
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: items.length,
@@ -3072,7 +3100,8 @@ class OriginalAudiosTab extends StatelessWidget {
 
 
 class OriginalDownloadsTab extends StatelessWidget {
-  const OriginalDownloadsTab({super.key});
+  final Function({required String id, required String title, required String reciter, required Map<String, dynamic> reciterData, required String url}) onPlayAudio;
+  const OriginalDownloadsTab({super.key, required this.onPlayAudio});
 
   @override
   Widget build(BuildContext context) {
@@ -3115,7 +3144,14 @@ class OriginalDownloadsTab extends StatelessWidget {
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           subtitle: Text((track['reciter'] ?? '').toString(), textAlign: TextAlign.right,
                             style: const TextStyle(color: Colors.white60)),
-                          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)),
+                          trailing: const Icon(Icons.play_circle_fill_rounded, color: Color(0xFFC9A959), size: 34),
+                          onTap: () => onPlayAudio(
+                            id: id,
+                            title: (track['title'] ?? 'تلاوة').toString(),
+                            reciter: (track['reciter'] ?? '').toString(),
+                            reciterData: {'name': (track['reciter'] ?? '').toString()},
+                            url: '',
+                          ),
                         ),
                       );
                     },
