@@ -3037,156 +3037,76 @@ class OriginalHadithScreen extends StatelessWidget {
   }
 }
 
-class OriginalAudiosTab extends StatelessWidget {
-  final Function({required String id, required String title, required String reciter, required Map<String, dynamic> reciterData, required String url}) onPlayAudio;
-  final String Function(Map<String, dynamic> reciterData, int surahNum) resolveAudioUrl;
-
-  const OriginalAudiosTab({
-    super.key,
-    required this.onPlayAudio,
-    required this.resolveAudioUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: FutureBuilder<List<Map<String, dynamic>>>(
-        future: QuranakApi.getList('get_reciters', cacheKey: 'cached_reciters_v8'),
-        builder: (context, snap) {
-          final items = snap.data ?? const <Map<String, dynamic>>[];
-          if (items.isEmpty) {
-            return Center(child: Text(snap.connectionState == ConnectionState.waiting ? 'جاري تحميل القراء…' : 'لا يوجد قراء محفوظون أوفلاين بعد أول اتصال', style: const TextStyle(color: Colors.white60)));
-          }
-          return _buildList(context, items);
-        },
-      ),
-    );
-  }
-
-  Widget _buildList(BuildContext context, List<Map<String, dynamic>> items) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) {
-        final r = items[i];
-        final name = (r['name'] ?? 'قارئ').toString();
-        return ListTile(
-          tileColor: const Color(0xFF0F2B3D),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: const Color(0xFFC9A959).withOpacity(0.25)),
-          ),
-          leading: ReciterAvatarImage(data: r, size: 50, borderWidth: 2),
-          title: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          subtitle: const Text('اضغط لاستعراض السور الصوتية', style: TextStyle(color: Colors.white60, fontSize: 12)),
-          trailing: const Icon(Icons.chevron_left_rounded, color: Color(0xFFC9A959)),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => OriginalReciterDetailScreen(
-                reciterData: r,
-                onPlayAudio: onPlayAudio,
-                resolveAudioUrl: resolveAudioUrl,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+class OriginalAudiosTab extends StatefulWidget {
+  final Function({required String id,required String title,required String reciter,required Map<String,dynamic> reciterData,required String url}) onPlayAudio;
+  final String Function(Map<String,dynamic> reciterData,int surahNum) resolveAudioUrl;
+  const OriginalAudiosTab({super.key,required this.onPlayAudio,required this.resolveAudioUrl});
+  @override State<OriginalAudiosTab> createState()=>_OriginalAudiosTabState();
+}
+class _OriginalAudiosTabState extends State<OriginalAudiosTab>{
+  final _search=TextEditingController();String _query='';
+  @override void dispose(){_search.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>SafeArea(child:FutureBuilder<List<Map<String,dynamic>>>(
+    future:QuranakApi.getList('get_reciters',cacheKey:'cached_reciters_v8'),
+    builder:(context,snap){
+      final all=snap.data??<Map<String,dynamic>>[];
+      final items=all.where((r)=>(r['name']??'').toString().toLowerCase().contains(_query.toLowerCase())).toList();
+      return Column(children:[
+        Padding(padding:const EdgeInsets.fromLTRB(16,16,16,10),child:TextField(controller:_search,onChanged:(v)=>setState(()=>_query=v),textAlign:TextAlign.right,style:const TextStyle(color:Colors.white),
+          decoration:InputDecoration(hintText:'ابحث عن قارئ...',hintStyle:const TextStyle(color:Colors.white54),prefixIcon:const Icon(Icons.search,color:Color(0xFFC9A959)),filled:true,fillColor:const Color(0xFF0D2B35),border:OutlineInputBorder(borderRadius:BorderRadius.circular(28),borderSide:const BorderSide(color:Color(0xFFC9A959)))))),
+        Expanded(child:all.isEmpty?Center(child:Text(snap.connectionState==ConnectionState.waiting?'جاري تحميل القراء…':'لا يوجد قراء متاحون',style:const TextStyle(color:Colors.white60))):items.isEmpty?const Center(child:Text('لا توجد نتائج مطابقة',style:TextStyle(color:Colors.white60))):GridView.builder(
+          padding:const EdgeInsets.all(12),gridDelegate:const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount:2,childAspectRatio:.92,crossAxisSpacing:12,mainAxisSpacing:12),itemCount:items.length,
+          itemBuilder:(context,i){final r=items[i];final name=(r['name']??'قارئ').toString();return InkWell(borderRadius:BorderRadius.circular(20),
+            onTap:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>OriginalReciterDetailScreen(reciterData:r,onPlayAudio:widget.onPlayAudio,resolveAudioUrl:widget.resolveAudioUrl))),
+            child:Container(padding:const EdgeInsets.all(12),decoration:BoxDecoration(gradient:const LinearGradient(colors:[Color(0xFF1A4755),Color(0xFF0D2B35)]),borderRadius:BorderRadius.circular(20),border:Border.all(color:const Color(0xFFC9A959).withOpacity(.4))),
+              child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[ReciterAvatarImage(data:r,size:94,borderWidth:3),const SizedBox(height:12),Text(name,maxLines:2,overflow:TextOverflow.ellipsis,textAlign:TextAlign.center,style:const TextStyle(color:Color(0xFFC9A959),fontSize:16,fontWeight:FontWeight.w900)),const SizedBox(height:5),const Text('استعراض التلاوات',style:TextStyle(color:Colors.white60,fontSize:11))])));
+          })),
+      ]);
+    },
+  ));
 }
 
-class OriginalReciterDetailScreen extends StatelessWidget {
-  final Map<String, dynamic> reciterData;
-  final Function({required String id, required String title, required String reciter, required Map<String, dynamic> reciterData, required String url}) onPlayAudio;
-  final String Function(Map<String, dynamic> reciterData, int surahNum) resolveAudioUrl;
-
-  const OriginalReciterDetailScreen({
-    super.key,
-    required this.reciterData,
-    required this.onPlayAudio,
-    required this.resolveAudioUrl,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final name = (reciterData['name'] ?? 'قارئ').toString();
-    final reciterKey = (reciterData['id'] ?? name).toString();
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF07131C),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0D2B35),
-        title: Text(name, style: const TextStyle(color: Color(0xFFC9A959), fontWeight: FontWeight.bold)),
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 16),
-          ReciterAvatarImage(data: reciterData, size: 96, borderWidth: 3),
-          const SizedBox(height: 10),
-          Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
-          const SizedBox(height: 12),
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: QuranakApi.getAudiosForReciter(reciterData['id']),
-              builder: (context, audioSnap) {
-                final apiRows = audioSnap.data ?? const <Map<String, dynamic>>[];
-                final count = apiRows.length;
-                if (audioSnap.connectionState == ConnectionState.waiting && count == 0) {
-                  return const Center(child: CircularProgressIndicator(color: Color(0xFFC9A959)));
-                }
-                if (count == 0) {
-                  return const Center(child: Text('لا توجد تلاوات محفوظة لهذا القارئ حتى الآن', style: TextStyle(color: Colors.white60)));
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-                  itemCount: count,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final apiRow = apiRows[i];
-                    final sNumInt = int.tryParse((apiRow['surah_number'] ?? (i + 1)).toString()) ?? (i + 1);
-                    final sNum = sNumInt.toString().padLeft(3, '0');
-                    final title = (apiRow['surah_name'] ?? apiRow['title'] ?? apiRow['name'] ?? 'سورة $sNumInt').toString();
-                    var url = (apiRow['audio_url'] ?? '').toString().trim();
-                    if ((apiRow['audio_type'] ?? '').toString() == 'file') {
-                      final filePath = (apiRow['file_path'] ?? '').toString().trim();
-                      url = filePath.isEmpty ? '' : 'https://quran1.kesug.com/uploads/${filePath.startsWith('/') ? filePath.substring(1) : filePath}';
-                    } else if (url.isEmpty) {
-                      url = resolveAudioUrl(reciterData, sNumInt);
-                    }
-                    if (url.isNotEmpty && !url.startsWith('http://') && !url.startsWith('https://')) {
-                      url = 'https://quran1.kesug.com/${url.startsWith('/') ? url.substring(1) : url}';
-                    }
-                    final id = '${reciterKey}_$sNum';
-                    return AnimatedBuilder(
-                      animation: OfflineAudioManager.instance,
-                      builder: (context, _) {
-                        final saved = OfflineAudioManager.instance.isSaved(id);
-                        final prog = OfflineAudioManager.instance.progressMap[id];
-                        return ListTile(
-                          tileColor: const Color(0xFF0F2B3D),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          leading: CircleAvatar(backgroundColor: const Color(0xFFC9A959), child: Text('$sNumInt', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
-                          title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          subtitle: Text(saved ? 'محفوظ بدون نت' : (apiRow['duration']?.toString().isNotEmpty == true ? apiRow['duration'].toString() : 'رقم السورة $sNumInt'), style: const TextStyle(color: Colors.white60, fontSize: 12)),
-                          trailing: prog != null
-                              ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(value: prog, strokeWidth: 2.5, color: const Color(0xFFC9A959)))
-                              : IconButton(
-                                  icon: Icon(saved ? Icons.download_done_rounded : Icons.download_rounded, color: saved ? const Color(0xFF10B981) : const Color(0xFFC9A959)),
-                                  onPressed: url.isEmpty ? null : () => OfflineAudioManager.instance.downloadTrack(id: id, title: title, reciter: name, url: url),
-                                ),
-                          onTap: url.isEmpty ? null : () => onPlayAudio(id: id, title: title, reciter: name, reciterData: reciterData, url: url),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+class OriginalReciterDetailScreen extends StatefulWidget {
+  final Map<String,dynamic> reciterData;
+  final Function({required String id,required String title,required String reciter,required Map<String,dynamic> reciterData,required String url}) onPlayAudio;
+  final String Function(Map<String,dynamic> reciterData,int surahNum) resolveAudioUrl;
+  const OriginalReciterDetailScreen({super.key,required this.reciterData,required this.onPlayAudio,required this.resolveAudioUrl});
+  @override State<OriginalReciterDetailScreen> createState()=>_OriginalReciterDetailScreenState();
+}
+class _OriginalReciterDetailScreenState extends State<OriginalReciterDetailScreen>{
+  final _search=TextEditingController();String _query='';Set<String> _favorites=<String>{};
+  @override void initState(){super.initState();AudioFavoriteStore.load().then((v){if(mounted)setState(()=>_favorites=v);});}
+  @override void dispose(){_search.dispose();super.dispose();}
+  String _audioUrl(Map<String,dynamic> row,int n){
+    final path=(row['file_path']??'').toString().trim();final raw=(row['audio_url']??row['url']??'').toString().trim();
+    if((row['audio_type']??'').toString()=='file'&&path.isNotEmpty)return 'https://quran1.kesug.com/uploads/${path.startsWith('/')?path.substring(1):path}';
+    if(raw.isNotEmpty)return raw.startsWith('http')?raw:'https://quran1.kesug.com/${raw.startsWith('/')?raw.substring(1):raw}';
+    return widget.resolveAudioUrl(widget.reciterData,n);
+  }
+  @override Widget build(BuildContext context){
+    final name=(widget.reciterData['name']??'قارئ').toString();final key=(widget.reciterData['id']??name).toString();
+    return Scaffold(backgroundColor:const Color(0xFF07131C),appBar:AppBar(backgroundColor:const Color(0xFF0D2B35),title:Text(name,style:const TextStyle(color:Color(0xFFC9A959),fontWeight:FontWeight.bold))),
+      body:Column(children:[
+        const SizedBox(height:14),ReciterAvatarImage(data:widget.reciterData,size:92,borderWidth:3),const SizedBox(height:8),Text(name,style:const TextStyle(fontSize:19,fontWeight:FontWeight.w900,color:Colors.white)),
+        Padding(padding:const EdgeInsets.fromLTRB(16,12,16,10),child:TextField(controller:_search,onChanged:(v)=>setState(()=>_query=v),textAlign:TextAlign.right,style:const TextStyle(color:Colors.white),decoration:InputDecoration(hintText:'ابحث عن سورة...',hintStyle:const TextStyle(color:Colors.white54),prefixIcon:const Icon(Icons.search,color:Color(0xFFC9A959)),filled:true,fillColor:const Color(0xFF0D2B35),border:OutlineInputBorder(borderRadius:BorderRadius.circular(24))))),
+        Expanded(child:FutureBuilder<List<Map<String,dynamic>>>(future:QuranakApi.getAudiosForReciter(widget.reciterData['id']),builder:(context,snap){
+          final all=snap.data??<Map<String,dynamic>>[];final rows=all.where((r)=>(r['surah_name']??r['title']??r['name']??'').toString().toLowerCase().contains(_query.toLowerCase())).toList();
+          if(all.isEmpty)return Center(child:Text(snap.connectionState==ConnectionState.waiting?'جاري تحميل التلاوات…':'لا توجد تلاوات لهذا القارئ',style:const TextStyle(color:Colors.white60)));
+          return ListView.separated(padding:const EdgeInsets.fromLTRB(14,4,14,20),itemCount:rows.length,separatorBuilder:(_,__)=>const SizedBox(height:9),itemBuilder:(context,i){
+            final row=rows[i];final n=int.tryParse((row['surah_number']??row['number']??(i+1)).toString())??i+1;final title=(row['surah_name']??row['title']??row['name']??'سورة $n').toString();final id='${key}_${n.toString().padLeft(3,'0')}';final url=_audioUrl(row,n);final duration=(row['duration']??row['duration_formatted']??'').toString();
+            return AnimatedBuilder(animation:OfflineAudioManager.instance,builder:(context,_){
+              final saved=OfflineAudioManager.instance.isSaved(id);final progress=OfflineAudioManager.instance.progressMap[id];final fav=_favorites.contains(id);
+              return Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:8),decoration:BoxDecoration(color:const Color(0xFF123546),borderRadius:BorderRadius.circular(16),border:Border.all(color:const Color(0xFFC9A959).withOpacity(.2))),
+                child:Row(children:[
+                  CircleAvatar(backgroundColor:const Color(0xFFC9A959),child:Text('$n',style:const TextStyle(color:Colors.black,fontWeight:FontWeight.w900))),
+                  const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(title,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),Text(duration.isNotEmpty?duration:'سورة رقم $n',style:const TextStyle(color:Colors.white60,fontSize:12))])),
+                  IconButton(tooltip:'تشغيل',onPressed:url.isEmpty?null:()=>widget.onPlayAudio(id:id,title:title,reciter:name,reciterData:widget.reciterData,url:url),icon:const Icon(Icons.play_circle_fill_rounded,color:Color(0xFFC9A959),size:31)),
+                  IconButton(tooltip:fav?'إزالة من المفضلة':'إضافة للمفضلة',onPressed:()async{final v=await AudioFavoriteStore.toggle(id);if(mounted)setState((){if(v){_favorites.add(id);}else{_favorites.remove(id);}});},icon:Icon(fav?Icons.favorite:Icons.favorite_border,color:fav?Colors.redAccent:Colors.white70)),
+                  progress!=null?SizedBox(width:23,height:23,child:CircularProgressIndicator(value:progress,strokeWidth:2,color:const Color(0xFFC9A959))):IconButton(tooltip:saved?'حذف التنزيل':'تحميل',onPressed:url.isEmpty?null:()=>saved?OfflineAudioManager.instance.removeTrack(id):OfflineAudioManager.instance.downloadTrack(id:id,title:title,reciter:name,url:url,reciterData:widget.reciterData),icon:Icon(saved?Icons.download_done:Icons.download_rounded,color:saved?const Color(0xFF10B981):const Color(0xFFC9A959))),
+                ]));
+            });
+          });
+        })),
+      ]));
   }
 }
