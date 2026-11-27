@@ -20,6 +20,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -716,6 +717,11 @@ class OfflineAudioManager extends ChangeNotifier {
 
   bool isSaved(String id) => tracks.any((e) => e['id'] == id);
 
+  Future<void> removeTrack(String id) async {
+    for(final t in tracks.where((e)=>e['id']==id)){final p=(t['localPath']??'').toString();if(p.isNotEmpty){try{await File(p).delete();}catch(_){}}}
+    tracks.removeWhere((e)=>e['id']==id);await _save();notifyListeners();
+  }
+
   String? localPathOf(String id) {
     final m = tracks.where((e) => e['id'] == id).toList();
     return m.isEmpty ? null : m.first['localPath'] as String?;
@@ -726,6 +732,7 @@ class OfflineAudioManager extends ChangeNotifier {
     required String title,
     required String reciter,
     required String url,
+    Map<String,dynamic>? reciterData,
   }) async {
     if (progressMap.containsKey(id) || url.isEmpty) return;
     try {
@@ -752,12 +759,54 @@ class OfflineAudioManager extends ChangeNotifier {
       );
 
       tracks.removeWhere((e) => e['id'] == id);
-      tracks.insert(0, {'id': id, 'title': title, 'reciter': reciter, 'localPath': dest});
+      tracks.insert(0, {'id': id, 'title': title, 'reciter': reciter, 'localPath': dest, 'sourceUrl': url, 'reciterData': reciterData ?? <String,dynamic>{}});
       await _save();
     } finally {
       progressMap.remove(id);
       notifyListeners();
     }
+  }
+}
+
+class OfflineVideoManager extends ChangeNotifier {
+  static final instance = OfflineVideoManager._();
+  OfflineVideoManager._();
+  final Dio _dio = Dio();
+  final Map<String,double> progressMap = {};
+  List<Map<String,dynamic>> videos = [];
+  Future<void> init() async {
+    try {
+      final p=await SharedPreferences.getInstance();
+      final raw=p.getString('offline_videos_v1');
+      if(raw!=null) videos=(jsonDecode(raw) as List).whereType<Map>().map((e)=>Map<String,dynamic>.from(e)).where((e)=>File((e['localPath']??'').toString()).existsSync()).toList();
+      await _save();
+    } catch (_) {}
+    notifyListeners();
+  }
+  Future<void> _save() async { final p=await SharedPreferences.getInstance(); await p.setString('offline_videos_v1',jsonEncode(videos)); }
+  bool isSaved(String id)=>videos.any((e)=>e['id']==id);
+  Future<void> download({required String id,required String title,required String reciter,required String url,String? thumbnail}) async {
+    if(url.isEmpty||progressMap.containsKey(id)||isSaved(id))return;
+    try {
+      final d=await getApplicationDocumentsDirectory(); final folder=Directory('${d.path}/quranak_videos_v1');
+      if(!folder.existsSync())folder.createSync(recursive:true);
+      final safe=id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'),'_'); final dest='${folder.path}/$safe.mp4';
+      progressMap[id]=.01;notifyListeners();
+      await _dio.download(url,dest,options:Options(headers:{'User-Agent':'Mozilla/5.0'}),onReceiveProgress:(a,b){if(b>0){progressMap[id]=a/b;notifyListeners();}});
+      videos.removeWhere((e)=>e['id']==id); videos.insert(0,{'id':id,'title':title,'reciter':reciter,'localPath':dest,'sourceUrl':url,'thumbnail':thumbnail??''}); await _save();
+    } finally {progressMap.remove(id);notifyListeners();}
+  }
+  Future<void> remove(String id) async {
+    for(final v in videos.where((e)=>e['id']==id)){final p=(v['localPath']??'').toString();if(p.isNotEmpty){try{await File(p).delete();}catch(_){}}}
+    videos.removeWhere((e)=>e['id']==id);await _save();notifyListeners();
+  }
+}
+
+class AudioFavoriteStore {
+  static Future<Set<String>> load() async {final p=await SharedPreferences.getInstance();return (p.getStringList('quranak_favorite_audio_v1')??<String>[]).toSet();}
+  static Future<bool> toggle(String id) async {
+    final p=await SharedPreferences.getInstance();final s=(p.getStringList('quranak_favorite_audio_v1')??<String>[]).toSet();
+    if(s.contains(id)){s.remove(id);}else{s.add(id);}await p.setStringList('quranak_favorite_audio_v1',s.toList());return s.contains(id);
   }
 }
 
@@ -1024,89 +1073,11 @@ class QuranakApp extends StatelessWidget {
 
 class QuranakIntroScreen extends StatefulWidget {
   const QuranakIntroScreen({super.key});
-
-  @override
-  State<QuranakIntroScreen> createState() => _QuranakIntroScreenState();
+  @override State<QuranakIntroScreen> createState()=>_QuranakIntroScreenState();
 }
-
-class _QuranakIntroScreenState extends State<QuranakIntroScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _fade;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
-      ..forward();
-    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-
-    Timer(const Duration(milliseconds: 1700), () {
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const OriginalMainShell()),
-        );
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF0D2B35), Color(0xFF071915), Color(0xFF07131C)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: FadeTransition(
-          opacity: _fade,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 108,
-                height: 108,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(colors: [Color(0xFFC9A959), Color(0xFFA8893A)]),
-                  boxShadow: [
-                    BoxShadow(color: const Color(0xFFC9A959).withOpacity(0.35), blurRadius: 24),
-                  ],
-                ),
-                child: const Icon(Icons.menu_book_rounded, size: 54, color: Colors.black),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'قُرْآنَك',
-                style: TextStyle(
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFFC9A959),
-                  letterSpacing: 1.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'القرآن الكريم • مواقيت الصلاة • صوتيات وريلز',
-                style: TextStyle(fontSize: 13, color: Colors.white70),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+class _QuranakIntroScreenState extends State<QuranakIntroScreen>{
+  @override void initState(){super.initState();Timer(const Duration(milliseconds:1900),(){if(mounted)Navigator.pushReplacement(context,MaterialPageRoute(builder:(_)=>const OriginalMainShell()));});}
+  @override Widget build(BuildContext context)=>Scaffold(backgroundColor:const Color(0xFF071915),body:SizedBox.expand(child:Image.asset('assets/images/quranak_splash.jpg',fit:BoxFit.cover)));
 }
 
 class OriginalMainShell extends StatefulWidget {
@@ -1145,6 +1116,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
   Future<void> _initEverything() async {
     // Render the shell immediately; disk/network services are non-blocking.
     unawaited(OfflineAudioManager.instance.init());
+    unawaited(OfflineVideoManager.instance.init());
     unawaited(QuranakApi.syncCatalogs().then((_) { if (mounted) setState(() {}); }));
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1353,6 +1325,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         resolveAudioUrl: _resolveReciterAudioUrl,
       ),
       OriginalReelsTab(isActive: _tabIndex == 4),
+      OriginalDownloadsTab(onPlayAudio: _playSurahAudio),
     ];
 
     return Scaffold(
@@ -1432,6 +1405,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
                 BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'أجزاء'),
                 BottomNavigationBarItem(icon: Icon(Icons.headphones_rounded), label: 'صوتيات'),
                 BottomNavigationBarItem(icon: Icon(Icons.movie_filter_rounded), label: 'ريلز'),
+                BottomNavigationBarItem(icon: Icon(Icons.download_for_offline_rounded), label: 'تحميلات'),
               ],
             ),
           ),
@@ -2498,6 +2472,20 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
   VideoPlayerController? _vc;
   int _currentIdx = 0;
   String _currentUrl = '';
+  Set<String> _likedIds = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(OfflineVideoManager.instance.init());
+    SharedPreferences.getInstance().then((p) { if(mounted) setState(() => _likedIds=(p.getStringList('quranak_reel_likes_v1')??<String>[]).toSet()); });
+  }
+
+  Future<void> _toggleLike(String id) async {
+    final p=await SharedPreferences.getInstance(); final s=Set<String>.from(_likedIds);
+    if(s.contains(id)){s.remove(id);}else{s.add(id);} await p.setStringList('quranak_reel_likes_v1',s.toList());
+    if(mounted)setState(()=>_likedIds=s);
+  }
 
   @override
   void didUpdateWidget(covariant OriginalReelsTab oldWidget) {
@@ -2514,7 +2502,9 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
       if (path.isEmpty) return '';
       return 'https://quran1.kesug.com/uploads/${path.startsWith('/') ? path.substring(1) : path}';
     }
-    return (data['video_url'] ?? data['videoUrl'] ?? data['url'] ?? '').toString().trim();
+    final raw=(data['video_url'] ?? data['videoUrl'] ?? data['url'] ?? '').toString().trim();
+    if(raw.isEmpty||raw.startsWith('http://')||raw.startsWith('https://'))return raw;
+    return 'https://quran1.kesug.com/${raw.startsWith('/')?raw.substring(1):raw}';
   }
 
   Future<void> _loadVideo(String url) async {
