@@ -44,6 +44,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 @pragma('vm:entry-point')
 Future<void> onAdhanAlarmFired(int alarmId, Map<String, dynamic> params) async {
+  if (params['task'] == 'refresh_prayer_schedule') {
+    final lat = (params['lat'] as num?)?.toDouble();
+    final lng = (params['lng'] as num?)?.toDouble();
+    final city = (params['cityName'] ?? 'القاهرة').toString();
+    if (lat != null && lng != null) {
+      await AdhanAlarmService.schedule7DaysForCity(lat, lng, city);
+    }
+    return;
+  }
   final prayerName = (params['prayerName'] ?? 'الصلاة').toString();
   final cityName = (params['cityName'] ?? 'القاهرة').toString();
 
@@ -274,6 +283,7 @@ class AdhanAlarmService {
       try { await AndroidAlarmManager.cancel(8000 + i); } catch (_) {}
       try { await flutterLocalNotificationsPlugin.cancel(7000 + i); } catch (_) {}
     }
+    try { await AndroidAlarmManager.cancel(7999); } catch (_) {}
 
     for (int day = 0; day < 7; day++) {
       final dt = now.add(Duration(days: day));
@@ -308,6 +318,22 @@ class AdhanAlarmService {
         }
       }
     }
+
+    // Keep a rolling seven-day schedule even when the user does not reopen
+    // the app every morning. This alarm refreshes the next week at 00:05.
+    final nextRefresh = DateTime(now.year, now.month, now.day + 1, 0, 5);
+    try {
+      await AndroidAlarmManager.oneShotAt(
+        nextRefresh,
+        7999,
+        onAdhanAlarmFired,
+        exact: true,
+        wakeup: true,
+        alarmClock: true,
+        rescheduleOnReboot: true,
+        params: {'task': 'refresh_prayer_schedule', 'lat': lat, 'lng': lng, 'cityName': cityAr},
+      );
+    } catch (_) {}
 
     final today = PrayerTimes.today(coords, params);
     return {
@@ -2060,6 +2086,8 @@ class _MushafPageViewerScreenState extends State<MushafPageViewerScreen> {
   late int _page;
   String _currentSurahName = '';
   String _cacheDir = '';
+  bool _downloadingAllPages = false;
+  int _downloadedPages = 0;
 
   @override
   void initState() {
@@ -2093,6 +2121,24 @@ class _MushafPageViewerScreenState extends State<MushafPageViewerScreen> {
     return name;
   }
 
+  Future<void> _downloadAllPages() async {
+    if (_cacheDir.isEmpty || _downloadingAllPages) return;
+    setState(() { _downloadingAllPages = true; _downloadedPages = 0; });
+    for (int page = 1; page <= 604; page++) {
+      if (!mounted) return;
+      final file = await _cachePage(page);
+      if (file != null && file.existsSync() && file.lengthSync() > 1000) {
+        if (mounted) setState(() => _downloadedPages++);
+      }
+    }
+    if (mounted) {
+      setState(() => _downloadingAllPages = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تم حفظ $_downloadedPages من 604 صفحة على الهاتف')),
+      );
+    }
+  }
+
   Future<File?> _cachePage(int pageNum) async {
     if (_cacheDir.isEmpty) return null;
     final pStr = pageNum.toString().padLeft(3, '0');
@@ -2124,6 +2170,13 @@ class _MushafPageViewerScreenState extends State<MushafPageViewerScreen> {
           style: const TextStyle(color: Color(0xFFC9A959), fontWeight: FontWeight.bold),
         ),
         actions: [
+          IconButton(
+            tooltip: _downloadingAllPages ? 'جاري تنزيل $_downloadedPages من 604' : 'تنزيل المصحف كاملًا',
+            onPressed: _downloadingAllPages ? null : _downloadAllPages,
+            icon: _downloadingAllPages
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFC9A959)))
+                : const Icon(Icons.download_for_offline_rounded, color: Color(0xFFC9A959)),
+          ),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(left: 14),
