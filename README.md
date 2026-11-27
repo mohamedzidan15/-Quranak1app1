@@ -1,13 +1,15 @@
 # قرآنك — Native Android source (v8 integration)
 
-This repository contains the Flutter Android application source and the website API integration for `https://quran1.kesug.com`.
+This repository contains the Flutter Android application source and the PHP/SQL API integration for `https://quranak.alwaysdata.net/index.php`.
 
 ## What is included
 - Flutter native Android app source (`quranak_flutter_app/`).
 - Website read API integration for reciters, videos, books, azkar categories and hadiths.
 - Local catalog caching using SharedPreferences. Previously synchronized catalogs remain available when the device is offline.
 - Quran surah index bundled in Dart source; prayer-time calculations run locally.
-- Offline audio download manager for tracks the user chooses to save.
+- Offline audio and video download managers, with a dedicated downloads library.
+- Searchable reciter directory, favorites, audio queue controls and TikTok-style reels interactions.
+- Quranak supplied logo used for the app launcher icon and intro screen.
 - Supplied adhan audio bundled in Flutter assets and Android raw resources.
 - Five supplied prayer background images bundled locally (no network needed for those images).
 - GitHub Actions workflow to generate Android Gradle scaffolding, analyze, test, build a release APK and publish it as an artifact.
@@ -16,14 +18,14 @@ This repository contains the Flutter Android application source and the website 
 The app shell, prayer-time calculations, surah index, supplied prayer images, and bundled adhan do not require internet. Reciters/videos/books/azkar/hadith catalogs are cached after a successful sync. Audio becomes offline only after the user downloads it. Streaming videos and Quran page images that have not previously been cached still require internet. This repository does not claim that every remote media file is preloaded on installation.
 
 ## API
-The app uses read-only GET endpoints on the existing website, for example:
+The app uses read-only GET endpoints on the new Alwaysdata API, for example:
 - `index.php?action=get_reciters`
 - `index.php?action=get_videos`
 - `index.php?action=get_books&status=1`
 - `index.php?action=get_azkar_categories`
 - `index.php?action=get_hadiths`
 
-The Android app does not connect directly to MySQL and does not contain database credentials. The existing PHP site remains the data source.
+The Android app does not connect directly to MySQL and does not contain database credentials. Alwaysdata PHP API is the app data source; legacy media URLs are retained only where the database still points to the original media host.
 
 ## Build on GitHub
 1. Upload the contents of this repository to the root of your GitHub repository, preserving `.github/` and `tool/`.
