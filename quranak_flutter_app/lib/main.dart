@@ -256,7 +256,7 @@ class AdhanAlarmService {
     } catch (_) {}
   }
 
-  static Future<Map<String, DateTime>> schedule7DaysForCity(
+  static Future<Map<String, DateTime>> schedule30DaysForCity(
     double lat,
     double lng,
     String cityAr,
@@ -270,12 +270,12 @@ class AdhanAlarmService {
     int notifId = 7000;
 
     // Replace only this app's 35 prayer alarms; do not erase other notifications.
-    for (int i = 1; i <= 35; i++) {
+    for (int i = 1; i <= 150; i++) {
       try { await flutterLocalNotificationsPlugin.cancel(7000 + i); } catch (_) {}
       try { await AndroidAlarmManager.cancel(8000 + i); } catch (_) {}
     }
 
-    for (int day = 0; day < 7; day++) {
+    for (int day = 0; day < 30; day++) {
       final dt = now.add(Duration(days: day));
       final pt = PrayerTimes(coords, DateComponents.from(dt), params);
       final prayers = [
@@ -1126,7 +1126,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedCity', city.ar);
     await AdhanAlarmService.init();
-    final times = await AdhanAlarmService.schedule7DaysForCity(city.lat, city.lng, city.ar);
+    final times = await AdhanAlarmService.schedule30DaysForCity(city.lat, city.lng, city.ar);
     if (mounted) {
       setState(() => _prayerTimes = times);
       _startLiveCountdown();
