@@ -146,8 +146,8 @@ void main() async {
 }
 
 class AdhanAlarmService {
-  static const String adhanAlarmChannelId = 'quranak_adhan_alarm_v8';
-  static const String adminChannelId = 'quranak_admin_broadcast_v8';
+  static const String adhanAlarmChannelId = 'quranak_adhan_alarm_v9';
+  static const String adminChannelId = 'quranak_admin_broadcast_v9';
   static bool _screenOpen = false;
 
   static void openAdhanScreen(String prayerTitle) {
@@ -1284,7 +1284,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         var src=(row['audio_url']??row['url']??'').toString().trim();
         if((row['audio_type']??'').toString()=='file'||src.isEmpty){
           final p=(row['file_path']??'').toString().trim();
-          if(p.isNotEmpty)src=_absoluteMediaUrl('uploads/${p.startsWith('/')?p.substring(1):p}');
+          if(p.isNotEmpty){final clean=p.replaceFirst(RegExp(r'^/+'),'');src=_absoluteMediaUrl(clean.startsWith('uploads/')?clean:'uploads/$clean');}
         }else{src=_absoluteMediaUrl(src);}
         if(src.isEmpty)continue;
         final trackId='${rkey}_${(n??queue.length+1).toString().padLeft(3,'0')}';
@@ -2498,7 +2498,8 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
     if (type == 'file') {
       final path = (data['file_path'] ?? '').toString().trim();
       if (path.isEmpty) return '';
-      return 'https://quran1.kesug.com/uploads/${path.startsWith('/') ? path.substring(1) : path}';
+      final clean=path.replaceFirst(RegExp(r'^/+'),'');
+      return 'https://quran1.kesug.com/${clean.startsWith('uploads/')?clean:'uploads/$clean'}';
     }
     final raw=(data['video_url'] ?? data['videoUrl'] ?? data['url'] ?? '').toString().trim();
     if(raw.isEmpty||raw.startsWith('http://')||raw.startsWith('https://'))return raw;
@@ -3077,7 +3078,8 @@ class _OriginalReciterDetailScreenState extends State<OriginalReciterDetailScree
   @override void dispose(){_search.dispose();super.dispose();}
   String _audioUrl(Map<String,dynamic> row,int n){
     final path=(row['file_path']??'').toString().trim();final raw=(row['audio_url']??row['url']??'').toString().trim();
-    if((row['audio_type']??'').toString()=='file'&&path.isNotEmpty)return 'https://quran1.kesug.com/uploads/${path.startsWith('/')?path.substring(1):path}';
+    if((row['audio_type']??'').toString()=='file'&&path.isNotEmpty)final clean=path.replaceFirst(RegExp(r'^/+'),'');
+    return 'https://quran1.kesug.com/${clean.startsWith('uploads/')?clean:'uploads/$clean'}';
     if(raw.isNotEmpty)return raw.startsWith('http')?raw:'https://quran1.kesug.com/${raw.startsWith('/')?raw.substring(1):raw}';
     return widget.resolveAudioUrl(widget.reciterData,n);
   }
