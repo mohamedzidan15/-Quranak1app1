@@ -278,7 +278,7 @@ class AdhanAlarmService {
     final now = DateTime.now();
     int notifId = 7000;
 
-    // Replace only this app's 35 prayer alarms; do not erase other notifications.
+    // Replace only this app's scheduled prayer notifications; preserve unrelated notifications.
     for (int i = 1; i <= 150; i++) {
       try { await flutterLocalNotificationsPlugin.cancel(7000 + i); } catch (_) {}
       try { await AndroidAlarmManager.cancel(8000 + i); } catch (_) {}
