@@ -267,11 +267,13 @@ class AdhanAlarmService {
 
     final now = DateTime.now();
     int alarmSlotId = 8000;
-    int notifId = 7000;
 
-    try {
-      await flutterLocalNotificationsPlugin.cancelAll();
-    } catch (_) {}
+    // Cancel only the previous prayer schedule. Do not erase unrelated app
+    // notifications (admin messages, reminders, etc.).
+    for (int i = 1; i <= 35; i++) {
+      try { await AndroidAlarmManager.cancel(8000 + i); } catch (_) {}
+      try { await flutterLocalNotificationsPlugin.cancel(7000 + i); } catch (_) {}
+    }
 
     for (int day = 0; day < 7; day++) {
       final dt = now.add(Duration(days: day));
@@ -286,7 +288,6 @@ class AdhanAlarmService {
 
       for (final p in prayers) {
         alarmSlotId++;
-        notifId++;
         if (p.value.isAfter(now)) {
           try {
             await AndroidAlarmManager.oneShotAt(
@@ -304,49 +305,6 @@ class AdhanAlarmService {
             );
           } catch (_) {}
 
-          try {
-            final scheduled = tz.TZDateTime.from(p.value, tz.local);
-            await flutterLocalNotificationsPlugin.zonedSchedule(
-              notifId,
-              '🕌 حان الآن موعد صلاة ${p.key} ($cityAr)',
-              'الله أكبر الله أكبر • حيّ على الصلاة • حيّ على الفلاح',
-              scheduled,
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  adhanAlarmChannelId,
-                  'منبه الأذان التلقائي',
-                  importance: Importance.max,
-                  priority: Priority.max,
-                  category: AndroidNotificationCategory.alarm,
-                  fullScreenIntent: true,
-                  ongoing: true,
-                  autoCancel: false,
-                  playSound: true,
-                  sound: const RawResourceAndroidNotificationSound('adhan'),
-                  audioAttributesUsage: AudioAttributesUsage.alarm,
-                  additionalFlags: Int32List.fromList(<int>[4]),
-                  actions: const <AndroidNotificationAction>[
-                    AndroidNotificationAction(
-                      'stop_adhan',
-                      'إيقاف الأذان',
-                      showsUserInterface: true,
-                      cancelNotification: true,
-                    ),
-                  ],
-                ),
-                iOS: const DarwinNotificationDetails(
-                  presentAlert: true,
-                  presentSound: true,
-                  sound: 'adhan.mp3',
-                  interruptionLevel: InterruptionLevel.timeSensitive,
-                ),
-              ),
-              payload: 'adhan:صلاة ${p.key}',
-              androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-              uiLocalNotificationDateInterpretation:
-                  UILocalNotificationDateInterpretation.absoluteTime,
-            );
-          } catch (_) {}
         }
       }
     }
@@ -3170,12 +3128,12 @@ class OriginalReciterDetailScreen extends StatelessWidget {
                       final path = (row['file_path'] ?? '').toString().trim();
                       url = path.isEmpty ? '' : 'https://quranak.alwaysdata.net/${path.startsWith('/') ? path.substring(1) : path}';
                     } else if (url.isEmpty) {
-                      url = ' ';
+                      url = resolveAudioUrl(reciterData, number);
                     }
-                    if (url.isNotEmpty && url != ' ' && !url.startsWith('http')) {
+                    if (url.isNotEmpty && !url.startsWith('http')) {
                       url = 'https://quranak.alwaysdata.net/${url.startsWith('/') ? url.substring(1) : url}';
                     }
-                    if (url.isNotEmpty && url != ' ' && !OfflineAudioManager.instance.isSaved('${reciterKey}_$padded')) {
+                    if (url.isNotEmpty && !OfflineAudioManager.instance.isSaved('${reciterKey}_$padded')) {
                       await OfflineAudioManager.instance.downloadTrack(id: '${reciterKey}_$padded', title: title, reciter: name, url: url);
                       downloaded++;
                     }
