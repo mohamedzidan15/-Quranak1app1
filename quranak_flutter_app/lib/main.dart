@@ -758,7 +758,7 @@ class OfflineAudioManager extends ChangeNotifier {
       tracks.insert(0, {'id': id, 'title': title, 'reciter': reciter, 'localPath': dest, 'sourceUrl': url, 'reciterData': reciterData ?? <String,dynamic>{}});
       await _save();
     } catch (_) {
-      if(downloadPath!=null){try{await File(downloadPath!).delete();}catch(_){}}
+      if(downloadPath!=null){try{await File(downloadPath).delete();}catch(_){}}
     } finally {
       progressMap.remove(id);
       notifyListeners();
@@ -794,7 +794,8 @@ class OfflineVideoManager extends ChangeNotifier {
       progressMap[id]=.01;notifyListeners();
       await _dio.download(url,dest,options:Options(headers:{'User-Agent':'Mozilla/5.0'}),onReceiveProgress:(a,b){if(b>0){progressMap[id]=a/b;notifyListeners();}});
       videos.removeWhere((e)=>e['id']==id); videos.insert(0,{'id':id,'title':title,'reciter':reciter,'localPath':dest,'sourceUrl':url,'thumbnail':thumbnail??''}); await _save();
-    } finally {progressMap.remove(id);notifyListeners();}
+    } catch (_) { if(downloadPath!=null){try{await File(downloadPath).delete();}catch(_){}} }
+    finally {progressMap.remove(id);notifyListeners();}
   }
   Future<void> remove(String id) async {
     for(final v in videos.where((e)=>e['id']==id)){final p=(v['localPath']??'').toString();if(p.isNotEmpty){try{await File(p).delete();}catch(_){}}}
