@@ -13,7 +13,6 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:adhan/adhan.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'package:dio/dio.dart';
