@@ -2433,46 +2433,23 @@ class FullSpotifyPlayerSheet extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  StreamBuilder<LoopMode>(
-                    stream: player.loopModeStream,
-                    builder: (_, snap) {
-                      final isOne = snap.data == LoopMode.one;
-                      return IconButton(
-                        icon: Icon(Icons.repeat_one_rounded, color: isOne ? const Color(0xFFC9A959) : Colors.white54, size: 26),
-                        onPressed: () => player.setLoopMode(isOne ? LoopMode.off : LoopMode.one),
-                      );
-                    },
-                  ),
-                  StreamBuilder<PlayerState>(
-                    stream: player.playerStateStream,
-                    builder: (_, snap) {
-                      final playing = snap.data?.playing ?? false;
-                      return InkWell(
-                        onTap: () => playing ? player.pause() : player.play(),
-                        child: Container(
-                          width: 68,
-                          height: 68,
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: [Color(0xFFC9A959), Color(0xFFA8893A)]),
-                          ),
-                          child: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.black, size: 38),
-                        ),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.stop_circle_outlined, color: Colors.white70, size: 28),
-                    onPressed: () {
-                      player.stop();
-                      Navigator.pop(context);
-                    },
-                  ),
-                ],
-              ),
+              Row(mainAxisAlignment:MainAxisAlignment.spaceEvenly,children:[
+                StreamBuilder<bool>(stream:player.shuffleModeEnabledStream,builder:(_,snap)=>IconButton(
+                  tooltip:'خلط التشغيل',icon:Icon(Icons.shuffle_rounded,color:(snap.data??false)?const Color(0xFFC9A959):Colors.white54,size:24),
+                  onPressed:()=>player.setShuffleModeEnabled(!(snap.data??false)))),
+                IconButton(tooltip:'السابق',icon:const Icon(Icons.skip_previous_rounded,color:Colors.white,size:32),onPressed:player.hasPrevious?()=>player.seekToPrevious():null),
+                StreamBuilder<LoopMode>(stream:player.loopModeStream,builder:(_,snap){
+                  final mode=snap.data??LoopMode.off;
+                  return IconButton(tooltip:'تكرار',icon:Icon(mode==LoopMode.one?Icons.repeat_one_rounded:Icons.repeat_rounded,color:mode==LoopMode.off?Colors.white54:const Color(0xFFC9A959),size:26),
+                    onPressed:()=>player.setLoopMode(mode==LoopMode.off?LoopMode.all:mode==LoopMode.all?LoopMode.one:LoopMode.off));
+                }),
+                StreamBuilder<PlayerState>(stream:player.playerStateStream,builder:(_,snap){
+                  final playing=snap.data?.playing??false;
+                  return InkWell(onTap:()=>playing?player.pause():player.play(),child:Container(width:68,height:68,decoration:const BoxDecoration(shape:BoxShape.circle,gradient:LinearGradient(colors:[Color(0xFFC9A959),Color(0xFFA8893A)])),child:Icon(playing?Icons.pause_rounded:Icons.play_arrow_rounded,color:Colors.black,size:38)));
+                }),
+                IconButton(tooltip:'التالي',icon:const Icon(Icons.skip_next_rounded,color:Colors.white,size:32),onPressed:player.hasNext?()=>player.seekToNext():null),
+                IconButton(tooltip:'إيقاف',icon:const Icon(Icons.stop_circle_outlined,color:Colors.white70,size:27),onPressed:(){player.stop();Navigator.pop(context);}),
+              ]),
               const Spacer(),
             ],
           ),
