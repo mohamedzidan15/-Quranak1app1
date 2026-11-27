@@ -276,7 +276,6 @@ class AdhanAlarmService {
     params.madhab = Madhab.shafi;
 
     final now = DateTime.now();
-    int alarmSlotId = 8000;
     int notifId = 7000;
 
     // Replace only this app's 35 prayer alarms; do not erase other notifications.
