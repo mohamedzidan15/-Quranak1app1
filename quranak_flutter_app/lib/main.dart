@@ -1291,7 +1291,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         sources.add(local!=null&&File(local).existsSync()?AudioSource.file(local,tag:tag):AudioSource.uri(Uri.parse(src),tag:tag));
         queue.add({'id':id,'title':title,'reciter':reciter,'reciterData':reciterData,'url':src});
       }
-      selected=selected.clamp(0,sources.length-1);
+      selected=selected.clamp(0,sources.length-1).toInt();
       _audioQueue=queue;
       setState(()=>_playingSurah=title);
       setState(()=>_playingReciterData=reciterData);
@@ -3087,7 +3087,7 @@ class _OriginalReciterDetailScreenState extends State<OriginalReciterDetailScree
               return Container(padding:const EdgeInsets.symmetric(horizontal:10,vertical:8),decoration:BoxDecoration(color:const Color(0xFF123546),borderRadius:BorderRadius.circular(16),border:Border.all(color:const Color(0xFFC9A959).withOpacity(.2))),
                 child:Row(children:[
                   CircleAvatar(backgroundColor:const Color(0xFFC9A959),child:Text('$n',style:const TextStyle(color:Colors.black,fontWeight:FontWeight.w900))),
-                  const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(title,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),Text(duration.isNotEmpty?duration:'سورة رقم $n',style:const TextStyle(color:Colors.white60,fontSize:12))])),
+                  const SizedBox(width:8),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.end,children:[Text(title,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900)),Text(duration.isNotEmpty?duration:'المدة غير متاحة',style:const TextStyle(color:Colors.white60,fontSize:12))])),
                   IconButton(tooltip:'تشغيل',onPressed:url.isEmpty?null:()=>widget.onPlayAudio(id:id,title:title,reciter:name,reciterData:widget.reciterData,url:url),icon:const Icon(Icons.play_circle_fill_rounded,color:Color(0xFFC9A959),size:31)),
                   IconButton(tooltip:fav?'إزالة من المفضلة':'إضافة للمفضلة',onPressed:()async{final v=await AudioFavoriteStore.toggle(id);if(mounted)setState((){if(v){_favorites.add(id);}else{_favorites.remove(id);}});},icon:Icon(fav?Icons.favorite:Icons.favorite_border,color:fav?Colors.redAccent:Colors.white70)),
                   progress!=null?SizedBox(width:23,height:23,child:CircularProgressIndicator(value:progress,strokeWidth:2,color:const Color(0xFFC9A959))):IconButton(tooltip:saved?'حذف التنزيل':'تحميل',onPressed:url.isEmpty?null:()=>saved?OfflineAudioManager.instance.removeTrack(id):OfflineAudioManager.instance.downloadTrack(id:id,title:title,reciter:name,url:url,reciterData:widget.reciterData),icon:Icon(saved?Icons.download_done:Icons.download_rounded,color:saved?const Color(0xFF10B981):const Color(0xFFC9A959))),
