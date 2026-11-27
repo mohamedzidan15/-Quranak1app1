@@ -196,6 +196,16 @@ class AdhanAlarmService {
       },
     );
 
+    // If Android opened the activity from a full-screen prayer alarm, restore
+    // the alarm screen instead of leaving the user on the splash page.
+    try {
+      final launch = await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+      final payload = launch?.notificationResponse?.payload ?? '';
+      if ((launch?.didNotificationLaunchApp ?? false) && payload.startsWith('adhan:')) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => openAdhanScreen(payload.replaceFirst('adhan:', '')));
+      }
+    } catch (_) {}
+
     final androidExt = flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
 
