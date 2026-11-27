@@ -2563,35 +2563,97 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
             WidgetsBinding.instance.addPostFrameCallback((_) => _loadVideo(firstUrl));
           }
           return PageView.builder(
-            scrollDirection: Axis.vertical,
-            itemCount: docs.length,
-            onPageChanged: (i) {
-              setState(() => _currentIdx = i);
-              final d = docs[i];
-              final u = _videoSourceUrl(d);
-              _loadVideo(u);
-            },
-            itemBuilder: (context, i) {
-              final d = docs[i];
-              final title = (d['title'] ?? d['reciter_name'] ?? d['reciter'] ?? 'مقطع قرآني').toString();
-              final isReady = i == _currentIdx && _vc != null && _vc!.value.isInitialized;
-              return Stack(
-                fit: StackFit.expand,
-                children: [
-                  Container(color: Colors.black),
-                  if (isReady)
-                    Center(child: AspectRatio(aspectRatio: _vc!.value.aspectRatio > 0 ? _vc!.value.aspectRatio : 9 / 16, child: VideoPlayer(_vc!)))
-                  else
-                    const Center(child: Icon(Icons.play_circle_outline, size: 64, color: Colors.white54)),
-                  Positioned(bottom: 24, right: 16, left: 16, child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                ],
-              );
+            scrollDirection: Axis.vertical, itemCount: docs.length,
+            onPageChanged:(i){setState(()=>_currentIdx=i);_loadVideo(_videoSourceUrl(docs[i]));},
+            itemBuilder:(context,i){
+              final d=docs[i];
+              final title=(d['title']??d['reciter_name']??d['reciter']??'مقطع قرآني').toString();
+              final creator=(d['reciter_name']??d['reciter']??d['author']??'قرآنك').toString();
+              final id=(d['id']??d['video_id']??'${i}_${_videoSourceUrl(d)}').toString();
+              final url=_videoSourceUrl(d);
+              final profile=<String,dynamic>{'name':creator,'image':d['reciter_image']??d['profile_image']??d['avatar']??d['image']??''};
+              final ready=i==_currentIdx&&_vc!=null&&_vc!.value.isInitialized;
+              final liked=_likedIds.contains(id);
+              return Stack(fit:StackFit.expand,children:[
+                Container(color:const Color(0xFF02090D)),
+                if(ready) GestureDetector(onTap:(){setState((){if(_vc!.value.isPlaying){_vc!.pause();}else{_vc!.play();}});},child:Center(child:AspectRatio(aspectRatio:_vc!.value.aspectRatio>0?_vc!.value.aspectRatio:9/16,child:VideoPlayer(_vc!))))
+                else const Center(child:CircularProgressIndicator(color:Color(0xFFC9A959))),
+                Positioned(top:14,left:12,child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),decoration:BoxDecoration(color:Colors.black45,borderRadius:BorderRadius.circular(24)),child:const Text('ريلز قرآنك',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold)))),
+                Positioned(right:10,bottom:100,child:Column(children:[
+                  ReciterAvatarImage(data:profile,size:54,borderWidth:2.5),
+                  const SizedBox(height:16),
+                  IconButton(onPressed:()=>_toggleLike(id),icon:Icon(liked?Icons.favorite:Icons.favorite_border,color:liked?Colors.redAccent:Colors.white,size:32)),
+                  Text('${(int.tryParse((d['likes']??d['like_count']??0).toString())??0)+(liked?1:0)}',style:const TextStyle(color:Colors.white,fontWeight:FontWeight.bold)),
+                  const SizedBox(height:10),
+                  IconButton(onPressed:()=>Share.share('$title\n$url'),icon:const Icon(Icons.share_rounded,color:Colors.white,size:29)),
+                  AnimatedBuilder(animation:OfflineVideoManager.instance,builder:(_,__){
+                    final progress=OfflineVideoManager.instance.progressMap[id];final saved=OfflineVideoManager.instance.isSaved(id);
+                    return IconButton(onPressed:(url.isEmpty||saved||progress!=null)?null:()=>OfflineVideoManager.instance.download(id:id,title:title,reciter:creator,url:url,thumbnail:(d['thumbnail']??'').toString()),
+                      icon:progress!=null?SizedBox(width:24,height:24,child:CircularProgressIndicator(value:progress,strokeWidth:2,color:const Color(0xFFC9A959))):Icon(saved?Icons.download_done:Icons.download_rounded,color:saved?const Color(0xFF10B981):Colors.white,size:29));
+                  }),
+                ])),
+                Positioned(bottom:26,left:18,right:82,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+                  Text(creator,style:const TextStyle(color:Colors.white,fontWeight:FontWeight.w900,fontSize:17),maxLines:1,overflow:TextOverflow.ellipsis),
+                  const SizedBox(height:5),
+                  Text(title,style:const TextStyle(color:Colors.white,fontSize:14),maxLines:2,overflow:TextOverflow.ellipsis),
+                ])),
+                if(ready&&!_vc!.value.isPlaying)const Center(child:Icon(Icons.play_arrow_rounded,size:78,color:Colors.white70)),
+              ]);
             },
           );
         },
       ),
     );
   }
+}
+
+class OriginalDownloadsTab extends StatelessWidget {
+  final Function({required String id,required String title,required String reciter,required Map<String,dynamic> reciterData,required String url}) onPlayAudio;
+  const OriginalDownloadsTab({super.key,required this.onPlayAudio});
+  @override Widget build(BuildContext context)=>SafeArea(child:AnimatedBuilder(
+    animation:OfflineAudioManager.instance,builder:(context,_){
+      return AnimatedBuilder(animation:OfflineVideoManager.instance,builder:(context,__){
+        final audios=OfflineAudioManager.instance.tracks;final videos=OfflineVideoManager.instance.videos;
+        return ListView(padding:const EdgeInsets.fromLTRB(16,18,16,30),children:[
+          const Text('تحميلاتي',textAlign:TextAlign.right,style:TextStyle(color:Color(0xFFC9A959),fontSize:24,fontWeight:FontWeight.w900)),
+          const SizedBox(height:5),
+          Text('${audios.length} صوتية • ${videos.length} فيديو',textAlign:TextAlign.right,style:const TextStyle(color:Colors.white60)),
+          const SizedBox(height:20),
+          const Text('الصوتيات',textAlign:TextAlign.right,style:TextStyle(color:Colors.white,fontSize:18,fontWeight:FontWeight.bold)),
+          if(audios.isEmpty)const Padding(padding:EdgeInsets.all(16),child:Text('لا توجد صوتيات محمّلة بعد',textAlign:TextAlign.right,style:TextStyle(color:Colors.white54))),
+          ...audios.map((a){final id=(a['id']??'').toString();final data=Map<String,dynamic>.from(a['reciterData'] as Map? ?? {});
+            return Card(color:const Color(0xFF123546),child:ListTile(
+              leading:IconButton(icon:const Icon(Icons.play_circle_fill,color:Color(0xFFC9A959),size:32),onPressed:()=>onPlayAudio(id:id,title:(a['title']??'تلاوة').toString(),reciter:(a['reciter']??'').toString(),reciterData:data,url:(a['sourceUrl']??'').toString())),
+              title:Text((a['title']??'تلاوة').toString(),style:const TextStyle(color:Colors.white,fontWeight:FontWeight.bold)),
+              subtitle:Text((a['reciter']??'').toString(),style:const TextStyle(color:Colors.white60)),
+              trailing:IconButton(icon:const Icon(Icons.delete_outline,color:Colors.redAccent),onPressed:()=>OfflineAudioManager.instance.removeTrack(id)),
+            ));
+          }),
+          const SizedBox(height:18),
+          const Text('الفيديوهات',textAlign:TextAlign.right,style:TextStyle(color:Colors.white,fontSize:18,fontWeight:FontWeight.bold)),
+          if(videos.isEmpty)const Padding(padding:EdgeInsets.all(16),child:Text('لا توجد فيديوهات محمّلة بعد',textAlign:TextAlign.right,style:TextStyle(color:Colors.white54))),
+          ...videos.map((v){final id=(v['id']??'').toString();return Card(color:const Color(0xFF123546),child:ListTile(
+            leading:IconButton(icon:const Icon(Icons.play_circle_fill,color:Color(0xFFC9A959),size:32),onPressed:()=>Navigator.push(context,MaterialPageRoute(builder:(_)=>DownloadedVideoScreen(path:(v['localPath']??'').toString(),title:(v['title']??'فيديو').toString())))),
+            title:Text((v['title']??'فيديو').toString(),style:const TextStyle(color:Colors.white,fontWeight:FontWeight.bold)),
+            subtitle:Text((v['reciter']??'').toString(),style:const TextStyle(color:Colors.white60)),
+            trailing:IconButton(icon:const Icon(Icons.delete_outline,color:Colors.redAccent),onPressed:()=>OfflineVideoManager.instance.remove(id)),
+          ));}),
+        ]);
+      });
+    },
+  ));
+}
+
+class DownloadedVideoScreen extends StatefulWidget {
+  final String path;final String title;
+  const DownloadedVideoScreen({super.key,required this.path,required this.title});
+  @override State<DownloadedVideoScreen> createState()=>_DownloadedVideoScreenState();
+}
+class _DownloadedVideoScreenState extends State<DownloadedVideoScreen>{
+  late final VideoPlayerController _controller;
+  @override void initState(){super.initState();_controller=VideoPlayerController.file(File(widget.path))..initialize().then((_){if(mounted){setState((){});_controller.play();}});}
+  @override void dispose(){_controller.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>Scaffold(backgroundColor:Colors.black,appBar:AppBar(title:Text(widget.title)),body:Center(child:_controller.value.isInitialized?AspectRatio(aspectRatio:_controller.value.aspectRatio,child:VideoPlayer(_controller)):const CircularProgressIndicator()));
 }
 
 class OriginalCalendarScreen extends StatefulWidget {
