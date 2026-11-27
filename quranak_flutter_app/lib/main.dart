@@ -3081,8 +3081,10 @@ class _OriginalReciterDetailScreenState extends State<OriginalReciterDetailScree
   @override void dispose(){_search.dispose();super.dispose();}
   String _audioUrl(Map<String,dynamic> row,int n){
     final path=(row['file_path']??'').toString().trim();final raw=(row['audio_url']??row['url']??'').toString().trim();
-    if((row['audio_type']??'').toString()=='file'&&path.isNotEmpty)final clean=path.replaceFirst(RegExp(r'^/+'),'');
-    return 'https://quran1.kesug.com/${clean.startsWith('uploads/')?clean:'uploads/$clean'}';
+    if((row['audio_type']??'').toString()=='file'&&path.isNotEmpty){
+      final clean=path.replaceFirst(RegExp(r'^/+'),'');
+      return 'https://quran1.kesug.com/${clean.startsWith("uploads/")?clean:"uploads/$clean"}';
+    }
     if(raw.isNotEmpty)return raw.startsWith('http')?raw:'https://quran1.kesug.com/${raw.startsWith('/')?raw.substring(1):raw}';
     return widget.resolveAudioUrl(widget.reciterData,n);
   }
