@@ -20,6 +20,7 @@ import 'package:hijri/hijri_calendar.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -524,20 +525,17 @@ class ReciterAvatarImage extends StatelessWidget {
         errorBuilder: (_, __, ___) => _fallback(),
       );
     } else {
-      inner = Image.network(
-        src,
+      inner = CachedNetworkImage(
+        imageUrl: src,
         width: size,
         height: size,
         fit: BoxFit.cover,
-        headers: const {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        httpHeaders: const {
+          'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
           'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
         },
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return _fallback();
-        },
-        errorBuilder: (_, __, ___) => _fallback(),
+        placeholder: (_, __) => _fallback(),
+        errorWidget: (_, __, ___) => _fallback(),
       );
     }
 
@@ -716,6 +714,19 @@ class OfflineAudioManager extends ChangeNotifier {
 
   bool isSaved(String id) => tracks.any((e) => e['id'] == id);
 
+  Future<void> deleteTrack(String id) async {
+    final matches = tracks.where((e) => e['id'] == id).toList();
+    for (final item in matches) {
+      final path = (item['localPath'] ?? '').toString();
+      if (path.isNotEmpty) {
+        try { final f = File(path); if (f.existsSync()) await f.delete(); } catch (_) {}
+      }
+    }
+    tracks.removeWhere((e) => e['id'] == id);
+    await _save();
+    notifyListeners();
+  }
+
   String? localPathOf(String id) {
     final m = tracks.where((e) => e['id'] == id).toList();
     return m.isEmpty ? null : m.first['localPath'] as String?;
@@ -867,10 +878,12 @@ const List<String> arabicWeekdaysShort = [
 ];
 
 String formatHijriArabic(HijriCalendar h) {
-  String monthName = h.longMonthName;
-  if (h.hMonth == 6 && !monthName.contains('الآخرة')) {
-    monthName = 'جمادى الآخرة';
-  }
+  const months = <int, String>{
+    1: 'المحرّم', 2: 'صفر', 3: 'ربيع الأول', 4: 'ربيع الآخر',
+    5: 'جمادى الأولى', 6: 'جمادى الآخرة', 7: 'رجب', 8: 'شعبان',
+    9: 'رمضان', 10: 'شوّال', 11: 'ذو القعدة', 12: 'ذو الحجة',
+  };
+  final monthName = months[h.hMonth] ?? 'الشهر الهجري';
   return '${h.hDay} $monthName ${h.hYear} هـ';
 }
 
@@ -1353,6 +1366,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         resolveAudioUrl: _resolveReciterAudioUrl,
       ),
       OriginalReelsTab(isActive: _tabIndex == 4),
+      const OriginalDownloadsTab(),
     ];
 
     return Scaffold(
@@ -1432,6 +1446,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
                 BottomNavigationBarItem(icon: Icon(Icons.grid_view_rounded), label: 'أجزاء'),
                 BottomNavigationBarItem(icon: Icon(Icons.headphones_rounded), label: 'صوتيات'),
                 BottomNavigationBarItem(icon: Icon(Icons.movie_filter_rounded), label: 'ريلز'),
+                BottomNavigationBarItem(icon: Icon(Icons.download_for_offline_rounded), label: 'تحميلات'),
               ],
             ),
           ),
@@ -1695,7 +1710,7 @@ class OriginalHomeTab extends StatelessWidget {
                   return const Center(child: Text('لا توجد مقاطع مضافة حديثاً', style: TextStyle(color: Colors.white54)));
                 }
                 OfflineCacheService.saveVideos(videos);
-                return _buildVideosRow(context, videos);
+                return _buildVideosRow(context, videos.take(8).toList());
               },
             ),
           ),
@@ -3045,6 +3060,66 @@ class OriginalAudiosTab extends StatelessWidget {
   }
 }
 
+
+
+class OriginalDownloadsTab extends StatelessWidget {
+  const OriginalDownloadsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: AnimatedBuilder(
+        animation: OfflineAudioManager.instance,
+        builder: (context, _) {
+          final tracks = OfflineAudioManager.instance.tracks;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(18, 22, 18, 12),
+                child: Text('تحميلاتي', textAlign: TextAlign.right,
+                  style: TextStyle(color: Color(0xFFC9A959), fontSize: 25, fontWeight: FontWeight.w900)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Text('الصوتيات المحفوظة على الهاتف: ${tracks.length}', textAlign: TextAlign.right,
+                  style: const TextStyle(color: Colors.white60)),
+              ),
+              const SizedBox(height: 12),
+              if (tracks.isEmpty)
+                const Expanded(child: Center(child: Text('لم يتم تنزيل صوتيات بعد', style: TextStyle(color: Colors.white60))))
+              else
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: tracks.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 9),
+                    itemBuilder: (context, i) {
+                      final track = tracks[i];
+                      final id = (track['id'] ?? '').toString();
+                      return Container(
+                        decoration: BoxDecoration(color: const Color(0xFF0F2B3D), borderRadius: BorderRadius.circular(15)),
+                        child: ListTile(
+                          leading: IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                            onPressed: () => OfflineAudioManager.instance.deleteTrack(id)),
+                          title: Text((track['title'] ?? 'تلاوة').toString(), textAlign: TextAlign.right,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          subtitle: Text((track['reciter'] ?? '').toString(), textAlign: TextAlign.right,
+                            style: const TextStyle(color: Colors.white60)),
+                          trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981)),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class OriginalReciterDetailScreen extends StatelessWidget {
   final Map<String, dynamic> reciterData;
   final Function({required String id, required String title, required String reciter, required Map<String, dynamic> reciterData, required String url}) onPlayAudio;
@@ -3075,6 +3150,42 @@ class OriginalReciterDetailScreen extends StatelessWidget {
           const SizedBox(height: 10),
           Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
           const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.download_for_offline_rounded, color: Color(0xFFC9A959)),
+                label: const Text('تحميل كل سور القارئ', style: TextStyle(color: Color(0xFFC9A959), fontWeight: FontWeight.bold)),
+                onPressed: () async {
+                  final rows = await QuranakApi.getAudiosForReciter(reciterData['id'], refresh: true);
+                  int downloaded = 0;
+                  for (var i = 0; i < rows.length; i++) {
+                    final row = rows[i];
+                    final number = int.tryParse((row['surah_number'] ?? (i + 1)).toString()) ?? (i + 1);
+                    final padded = number.toString().padLeft(3, '0');
+                    final title = (row['surah_name'] ?? row['title'] ?? row['name'] ?? 'سورة $number').toString();
+                    var url = (row['audio_url'] ?? '').toString().trim();
+                    if ((row['audio_type'] ?? '').toString() == 'file') {
+                      final path = (row['file_path'] ?? '').toString().trim();
+                      url = path.isEmpty ? '' : 'https://quranak.alwaysdata.net/${path.startsWith('/') ? path.substring(1) : path}';
+                    } else if (url.isEmpty) {
+                      url = ' ';
+                    }
+                    if (url.isNotEmpty && url != ' ' && !url.startsWith('http')) {
+                      url = 'https://quranak.alwaysdata.net/${url.startsWith('/') ? url.substring(1) : url}';
+                    }
+                    if (url.isNotEmpty && url != ' ' && !OfflineAudioManager.instance.isSaved('${reciterKey}_$padded')) {
+                      await OfflineAudioManager.instance.downloadTrack(id: '${reciterKey}_$padded', title: title, reciter: name, url: url);
+                      downloaded++;
+                    }
+                  }
+                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('اكتمل طلب التحميل: $downloaded ملف')));
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: QuranakApi.getAudiosForReciter(reciterData['id']),
@@ -3117,7 +3228,7 @@ class OriginalReciterDetailScreen extends StatelessWidget {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           leading: CircleAvatar(backgroundColor: const Color(0xFFC9A959), child: Text('$sNumInt', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold))),
                           title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          subtitle: Text(saved ? 'محفوظ بدون نت' : (apiRow['duration']?.toString().isNotEmpty == true ? apiRow['duration'].toString() : 'رقم السورة $sNumInt'), style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                          subtitle: Text(saved ? 'محفوظ بدون نت' : (apiRow['duration']?.toString().trim().isNotEmpty == true ? apiRow['duration'].toString() : 'اضغط للتشغيل'), style: const TextStyle(color: Colors.white60, fontSize: 12)),
                           trailing: prog != null
                               ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(value: prog, strokeWidth: 2.5, color: const Color(0xFFC9A959)))
                               : IconButton(
