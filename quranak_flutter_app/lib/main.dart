@@ -758,7 +758,7 @@ class OfflineAudioManager extends ChangeNotifier {
       tracks.insert(0, {'id': id, 'title': title, 'reciter': reciter, 'localPath': dest, 'sourceUrl': url, 'reciterData': reciterData ?? <String,dynamic>{}});
       await _save();
     } catch (_) {
-      if(downloadPath!=null){try{await File(downloadPath).delete();}catch(_){}}
+      if(downloadPath!=null){try{await File(downloadPath!).delete();}catch(_){}}
     } finally {
       progressMap.remove(id);
       notifyListeners();
@@ -2479,7 +2479,6 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
   @override
   void initState() {
     super.initState();
-    unawaited(OfflineVideoManager.instance.init());
     SharedPreferences.getInstance().then((p) { if(mounted) setState(() => _likedIds=(p.getStringList('quranak_reel_likes_v1')??<String>[]).toSet()); });
   }
 
