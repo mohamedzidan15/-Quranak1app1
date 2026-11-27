@@ -47,6 +47,10 @@ jobs:
         working-directory: quranak_flutter_app
         run: flutter pub get
 
+      - name: Generate Quranak launcher icons
+        working-directory: quranak_flutter_app
+        run: dart run flutter_launcher_icons
+
       - name: Remove generated template test
         working-directory: quranak_flutter_app
         run: rm -f test/widget_test.dart
