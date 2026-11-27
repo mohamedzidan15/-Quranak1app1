@@ -69,6 +69,21 @@ def configure_desugaring(app_file):
     app_file.write_text(text)
 
 
+
+def configure_launch_background():
+    # Flutter's generated default launch screen includes its own mark.
+    # Keep the native hand-off clean; the app immediately shows the Quranak artwork.
+    xml = '''<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="#071915" />
+</layer-list>
+'''
+    res = ROOT / "app" / "src" / "main" / "res"
+    for folder in ("drawable", "drawable-v21"):
+        target = res / folder / "launch_background.xml"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(xml)
+
 def main():
     settings_file = first_existing(SETTINGS_CANDIDATES)
     app_file = first_existing(APP_CANDIDATES)
@@ -76,6 +91,7 @@ def main():
         raise FileNotFoundError("Flutter did not generate android/app/build.gradle(.kts)")
     add_plugin(settings_file, app_file)
     configure_desugaring(app_file)
+    configure_launch_background()
     print(f"Android Gradle configuration verified: {app_file}")
 
 
