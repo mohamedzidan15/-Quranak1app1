@@ -1284,7 +1284,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
         var src=(row['audio_url']??row['url']??'').toString().trim();
         if((row['audio_type']??'').toString()=='file'||src.isEmpty){
           final p=(row['file_path']??'').toString().trim();
-          if(p.isNotEmpty){final clean=p.replaceFirst(RegExp(r'^/+'),'');src=_absoluteMediaUrl(clean.startsWith('uploads/')?clean:'uploads/$clean');}
+          if(p.isNotEmpty){final clean=p.replaceFirst(RegExp(r'^/+'),'');src=_absoluteMediaUrl(clean.startsWith("uploads/")?clean:"uploads/$clean");}
         }else{src=_absoluteMediaUrl(src);}
         if(src.isEmpty)continue;
         final trackId='${rkey}_${(n??queue.length+1).toString().padLeft(3,'0')}';
