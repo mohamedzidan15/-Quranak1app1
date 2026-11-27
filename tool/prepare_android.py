@@ -86,9 +86,9 @@ def configure_launch_background():
     if colors.exists():
         content = colors.read_text()
         if "quranak_splash_background" not in content:
-            colors.write_text(content.replace("</resources>", f"    {color}\\n</resources>"))
+            colors.write_text(content.replace("</resources>", f"    {color}\n</resources>"))
     else:
-        colors.write_text('<?xml version="1.0" encoding="utf-8"?>\\n<resources>\\n    ' + color + '\\n</resources>\\n')
+        colors.write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    ' + color + '\n</resources>\n')
     for folder in ("drawable", "drawable-v21"):
         target = res / folder / "launch_background.xml"
         target.parent.mkdir(parents=True, exist_ok=True)
