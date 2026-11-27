@@ -269,9 +269,11 @@ class AdhanAlarmService {
     int alarmSlotId = 8000;
     int notifId = 7000;
 
-    try {
-      await flutterLocalNotificationsPlugin.cancelAll();
-    } catch (_) {}
+    // Replace only this app's 35 prayer alarms; do not erase other notifications.
+    for (int i = 1; i <= 35; i++) {
+      try { await flutterLocalNotificationsPlugin.cancel(7000 + i); } catch (_) {}
+      try { await AndroidAlarmManager.cancel(8000 + i); } catch (_) {}
+    }
 
     for (int day = 0; day < 7; day++) {
       final dt = now.add(Duration(days: day));
@@ -288,22 +290,6 @@ class AdhanAlarmService {
         alarmSlotId++;
         notifId++;
         if (p.value.isAfter(now)) {
-          try {
-            await AndroidAlarmManager.oneShotAt(
-              p.value,
-              alarmSlotId,
-              onAdhanAlarmFired,
-              exact: true,
-              wakeup: true,
-              alarmClock: true,
-              rescheduleOnReboot: true,
-              params: {
-                'prayerName': p.key,
-                'cityName': cityAr,
-              },
-            );
-          } catch (_) {}
-
           try {
             final scheduled = tz.TZDateTime.from(p.value, tz.local);
             await flutterLocalNotificationsPlugin.zonedSchedule(
@@ -1139,6 +1125,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
     _selectedCity = city;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('selectedCity', city.ar);
+    await AdhanAlarmService.init();
     final times = await AdhanAlarmService.schedule7DaysForCity(city.lat, city.lng, city.ar);
     if (mounted) {
       setState(() => _prayerTimes = times);
@@ -1391,11 +1378,13 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
                         ],
                       ),
                     ),
+                    IconButton(icon: const Icon(Icons.skip_previous_rounded,color:Color(0xFFC9A959),size:27),onPressed:_audioPlayer.hasPrevious?()=>_audioPlayer.seekToPrevious():null),
                     IconButton(
                       icon: Icon(_isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
                           color: Colors.white, size: 34),
                       onPressed: () => _isPlaying ? _audioPlayer.pause() : _audioPlayer.play(),
                     ),
+                    IconButton(icon: const Icon(Icons.skip_next_rounded,color:Color(0xFFC9A959),size:27),onPressed:_audioPlayer.hasNext?()=>_audioPlayer.seekToNext():null),
                     IconButton(
                       icon: const Icon(Icons.close, color: Colors.white70, size: 20),
                       onPressed: () {
