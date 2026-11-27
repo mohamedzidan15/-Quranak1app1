@@ -2,7 +2,7 @@ name: Quranak Android Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/**']
     paths:
       - "quranak_flutter_app/**"
       - "tool/**"
