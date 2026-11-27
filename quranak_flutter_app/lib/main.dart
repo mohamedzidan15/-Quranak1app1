@@ -296,7 +296,6 @@ class AdhanAlarmService {
       ];
 
       for (final p in prayers) {
-        alarmSlotId++;
         notifId++;
         if (p.value.isAfter(now)) {
           try {
