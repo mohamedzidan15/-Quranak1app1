@@ -1102,13 +1102,18 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
   Map<String, dynamic> _playingReciterData = {};
   bool _isPlaying = false;
   StreamSubscription? _adminSub;
+  StreamSubscription<int?>? _audioIndexSub;
+  List<Map<String,dynamic>> _audioQueue = <Map<String,dynamic>>[];
   String? _lastNotifId;
 
   @override
   void initState() {
     super.initState();
-    _audioPlayer.playerStateStream.listen((s) {
-      if (mounted) setState(() => _isPlaying = s.playing);
+    _audioPlayer.playerStateStream.listen((s) { if (mounted) setState(() => _isPlaying = s.playing); });
+    _audioIndexSub = _audioPlayer.currentIndexStream.listen((index) {
+      if (index == null || index < 0 || index >= _audioQueue.length || !mounted) return;
+      final item = _audioQueue[index];
+      setState(() { _playingSurah=(item['title']??'').toString(); _playingReciter=(item['reciter']??'').toString(); _playingReciterData=Map<String,dynamic>.from(item['reciterData'] as Map? ?? {}); });
     });
     _initEverything();
   }
@@ -1260,39 +1265,55 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
     return ''; // Never invent a reciter URL; use the exact audio_url saved by the admin.
   }
 
+  String _absoluteMediaUrl(String raw) {
+    final v=raw.trim();
+    if(v.isEmpty||v.startsWith('http://')||v.startsWith('https://'))return v;
+    return 'https://quran1.kesug.com/${v.startsWith('/')?v.substring(1):v}';
+  }
+
   Future<void> _playSurahAudio({
-    required String id,
-    required String title,
-    required String reciter,
-    required Map<String, dynamic> reciterData,
-    required String url,
+    required String id,required String title,required String reciter,
+    required Map<String,dynamic> reciterData,required String url,
   }) async {
     try {
+      final rid=reciterData['id'];
+      final rows=rid==null?<Map<String,dynamic>>[]:await QuranakApi.getAudiosForReciter(rid);
+      final rkey=(reciterData['id']??reciter).toString();
+      final sources=<AudioSource>[];final queue=<Map<String,dynamic>>[];var selected=0;
+      final img=ReciterAvatarImage.extractBestImage(reciterData);
+      for(final row in rows){
+        final n=int.tryParse((row['surah_number']??row['number']??'').toString());
+        final t=(row['surah_name']??row['title']??row['name']??'تلاوة').toString();
+        var src=(row['audio_url']??row['url']??'').toString().trim();
+        if((row['audio_type']??'').toString()=='file'||src.isEmpty){
+          final p=(row['file_path']??'').toString().trim();
+          if(p.isNotEmpty)src=_absoluteMediaUrl('uploads/${p.startsWith('/')?p.substring(1):p}');
+        }else{src=_absoluteMediaUrl(src);}
+        if(src.isEmpty)continue;
+        final trackId='${rkey}_${(n??queue.length+1).toString().padLeft(3,'0')}';
+        final local=OfflineAudioManager.instance.localPathOf(trackId);
+        final tag=MediaItem(id:trackId,album:reciter,title:t,artist:reciter,artUri:img.startsWith('http')?Uri.tryParse(img):null);
+        sources.add(local!=null&&File(local).existsSync()?AudioSource.file(local,tag:tag):AudioSource.uri(Uri.parse(src),tag:tag));
+        queue.add({'id':trackId,'title':t,'reciter':reciter,'reciterData':reciterData,'url':src});
+        if(trackId==id||t==title)selected=sources.length-1;
+      }
+      if(sources.isEmpty){
+        final local=OfflineAudioManager.instance.localPathOf(id);
+        final tag=MediaItem(id:id,album:reciter,title:title,artist:reciter,artUri:img.startsWith('http')?Uri.tryParse(img):null);
+        final src=_absoluteMediaUrl(url);
+        sources.add(local!=null&&File(local).existsSync()?AudioSource.file(local,tag:tag):AudioSource.uri(Uri.parse(src),tag:tag));
+        queue.add({'id':id,'title':title,'reciter':reciter,'reciterData':reciterData,'url':src});
+      }
+      selected=selected.clamp(0,sources.length-1);
+      _audioQueue=queue;
+      setState(()=>_playingSurah=title);
+      setState(()=>_playingReciterData=reciterData);
+      setState(()=>_playingReciter=reciter);
       await _audioPlayer.stop();
-      setState(() {
-        _playingSurah = title;
-        _playingReciter = reciter;
-        _playingReciterData = reciterData;
-      });
-      final imgStr = ReciterAvatarImage.extractBestImage(reciterData);
-      final mediaItem = MediaItem(
-        id: id,
-        album: reciter,
-        title: title,
-        artist: reciter,
-        artUri: imgStr.startsWith('http') ? Uri.parse(imgStr) : null,
-      );
-      final local = OfflineAudioManager.instance.localPathOf(id);
-      if (local != null && File(local).existsSync()) {
-        await _audioPlayer.setAudioSource(AudioSource.file(local, tag: mediaItem));
-      } else {
-        await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(url), tag: mediaItem));
-      }
+      await _audioPlayer.setAudioSource(ConcatenatingAudioSource(children:sources,useLazyPreparation:true),initialIndex:selected);
       await _audioPlayer.play();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر تشغيل الصوت: $e')));
-      }
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('تعذر تشغيل الصوت: $e')));
     }
   }
 
@@ -1300,6 +1321,7 @@ class _OriginalMainShellState extends State<OriginalMainShell> {
   void dispose() {
     _countdownTimer?.cancel();
     _adminSub?.cancel();
+    _audioIndexSub?.cancel();
     _audioPlayer.dispose();
     super.dispose();
   }
