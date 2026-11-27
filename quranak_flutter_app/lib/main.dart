@@ -1736,8 +1736,8 @@ class OriginalHomeTab extends StatelessWidget {
             MaterialPageRoute(
               builder: (_) => OriginalReciterDetailScreen(
                 reciterData: r,
-                onPlayAudio: widget.onPlayAudio,
-                resolveAudioUrl: widget.resolveAudioUrl,
+                onPlayAudio: onPlayAudio,
+                resolveAudioUrl: resolveAudioUrl,
               ),
             ),
           ),
@@ -3085,8 +3085,8 @@ class _OriginalAudiosTabState extends State<OriginalAudiosTab> {
             MaterialPageRoute(
               builder: (_) => OriginalReciterDetailScreen(
                 reciterData: r,
-                onPlayAudio: onPlayAudio,
-                resolveAudioUrl: resolveAudioUrl,
+                onPlayAudio: widget.onPlayAudio,
+                resolveAudioUrl: widget.resolveAudioUrl,
               ),
             ),
           ),
