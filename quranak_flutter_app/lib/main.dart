@@ -2574,7 +2574,7 @@ class _OriginalReelsTabState extends State<OriginalReelsTab> {
               final liked=_likedIds.contains(id);
               return Stack(fit:StackFit.expand,children:[
                 Container(color:const Color(0xFF02090D)),
-                if(ready) GestureDetector(onTap:(){setState((){if(_vc!.value.isPlaying){_vc!.pause();}else{_vc!.play();}});},child:Center(child:AspectRatio(aspectRatio:_vc!.value.aspectRatio>0?_vc!.value.aspectRatio:9/16,child:VideoPlayer(_vc!))))
+                if(ready) GestureDetector(onTap:(){setState((){if(_vc!.value.isPlaying){_vc!.pause();}else{_vc!.play();}});},child:SizedBox.expand(child:FittedBox(fit:BoxFit.cover,child:SizedBox(width:_vc!.value.size.width,height:_vc!.value.size.height,child:VideoPlayer(_vc!)))))
                 else const Center(child:CircularProgressIndicator(color:Color(0xFFC9A959))),
                 Positioned(top:14,left:12,child:Container(padding:const EdgeInsets.symmetric(horizontal:12,vertical:7),decoration:BoxDecoration(color:Colors.black45,borderRadius:BorderRadius.circular(24)),child:const Text('ريلز قرآنك',style:TextStyle(color:Colors.white,fontWeight:FontWeight.bold)))),
                 Positioned(right:10,bottom:100,child:Column(children:[
