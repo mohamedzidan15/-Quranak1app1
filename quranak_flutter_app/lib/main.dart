@@ -729,6 +729,7 @@ class OfflineAudioManager extends ChangeNotifier {
     Map<String,dynamic>? reciterData,
   }) async {
     if (progressMap.containsKey(id) || url.isEmpty) return;
+    String? downloadPath;
     try {
       final base = await getApplicationDocumentsDirectory();
       final folder = Directory('${base.path}/quranak_offline_v8');
@@ -736,6 +737,7 @@ class OfflineAudioManager extends ChangeNotifier {
 
       final safeId = id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       final dest = '${folder.path}/$safeId.mp3';
+      downloadPath = dest;
 
       progressMap[id] = 0.05;
       notifyListeners();
@@ -755,6 +757,8 @@ class OfflineAudioManager extends ChangeNotifier {
       tracks.removeWhere((e) => e['id'] == id);
       tracks.insert(0, {'id': id, 'title': title, 'reciter': reciter, 'localPath': dest, 'sourceUrl': url, 'reciterData': reciterData ?? <String,dynamic>{}});
       await _save();
+    } catch (_) {
+      if(downloadPath!=null){try{await File(downloadPath).delete();}catch(_){}}
     } finally {
       progressMap.remove(id);
       notifyListeners();
@@ -781,10 +785,12 @@ class OfflineVideoManager extends ChangeNotifier {
   bool isSaved(String id)=>videos.any((e)=>e['id']==id);
   Future<void> download({required String id,required String title,required String reciter,required String url,String? thumbnail}) async {
     if(url.isEmpty||progressMap.containsKey(id)||isSaved(id))return;
+    String? downloadPath;
     try {
       final d=await getApplicationDocumentsDirectory(); final folder=Directory('${d.path}/quranak_videos_v1');
       if(!folder.existsSync())folder.createSync(recursive:true);
       final safe=id.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'),'_'); final dest='${folder.path}/$safe.mp4';
+      downloadPath=dest;
       progressMap[id]=.01;notifyListeners();
       await _dio.download(url,dest,options:Options(headers:{'User-Agent':'Mozilla/5.0'}),onReceiveProgress:(a,b){if(b>0){progressMap[id]=a/b;notifyListeners();}});
       videos.removeWhere((e)=>e['id']==id); videos.insert(0,{'id':id,'title':title,'reciter':reciter,'localPath':dest,'sourceUrl':url,'thumbnail':thumbnail??''}); await _save();
